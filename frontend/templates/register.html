@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>login</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/login.css') }}">
+    <link rel="stylesheet"
+        href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@48,400,0,0&icon_names=home" />
+    <script src="https://kit.fontawesome.com/d10563301d.js" crossorigin="anonymous"></script>
+    <script>
+        (function (d) {
+            var config = {
+                kitId: "sse2qfx",
+                scriptTimeout: 3000,
+                async: true,
+            },
+                h = d.documentElement,
+                t = setTimeout(function () {
+                    h.className =
+                        h.className.replace(/\bwf-loading\b/g, "") + " wf-inactive";
+                }, config.scriptTimeout),
+                tk = d.createElement("script"),
+                f = false,
+                s = d.getElementsByTagName("script")[0],
+                a;
+            h.className += " wf-loading";
+            tk.src = "https://use.typekit.net/" + config.kitId + ".js";
+            tk.async = true;
+            tk.onload = tk.onreadystatechange = function () {
+                a = this.readyState;
+                if (f || (a && a != "complete" && a != "loaded")) return;
+                f = true;
+                clearTimeout(t);
+                try {
+                    Typekit.load(config);
+                } catch (e) { }
+            };
+            s.parentNode.insertBefore(tk, s);
+        })(document);
+    </script>
+</head>
+
+<body>
+    <div id="login_section">
+        <form id="registerForm" method="post">
+            <div class="form-group">
+                <input autofocus class="form-control" type="text" name="username" placeholder="Username" />
+            </div>
+            <div class="form-group">
+                <input class="form-control" type="text" name="email" placeholder="Email" />
+            </div>
+            <div class="form-group">
+                <input class="form-control" type="password" name="password" placeholder="Password" />
+            </div>
+            <div class="form-group">
+                <input class="form-control" type="password" name="confirm_password" placeholder="Confirm Password" />
+            </div>
+            <input class="btn-primary" type="submit" value="Sign Up" />
+        </form>
+        Already have an account? <a href="{{ url_for('login') }}">Login here.</a>
+    </div>
+
+    <script src="{{ url_for('static', filename='api_connector.js') }}" defer></script>
+    <script>
+        document.getElementById("registerForm").addEventListener("submit", async (e) => {
+            e.preventDefault();
+
+            const data = {
+                username: e.target.username.value,
+                email: e.target.email.value,
+                password: e.target.password.value,
+                confirm_password: e.target.confirm_password.value
+            };
+
+            const result = await registerUser(data);
+            console.log(result)
+            alert(result.message)
+            // document.getElementById("message").innerText = result.message;
+        });
+    </script>
+</body>
