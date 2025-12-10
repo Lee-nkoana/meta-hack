@@ -14,7 +14,7 @@ body {
     position: absolute;
     background: #1A1A19;
     color: #fff;
-    background-image: url(https://s3.amazonaws.com/shecodesio-production/uploads/files/000/176/450/original/plants_background.jpg?1765254125);
+    background-image: url(https://s3.amazonaws.com/shecodesio-production/uploads/files/000/176/455/original/download_%283%29.jpg?1765281853);
     background-repeat: no-repeat;
     background-size: cover;
 }
@@ -39,36 +39,32 @@ body {
     /* padding: 30px 40px; */
     background: rgba(162, 150, 150, 0.12);
     border-radius: 16px;
-    box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
-    backdrop-filter: blur(2.1px);
-    -webkit-backdrop-filter: blur(2.1px);
+    box-shadow: 0 4px 30px rgba(0, 0, 0, 0.3);
+    backdrop-filter: blur(3px);
+    -webkit-backdrop-filter: blur(3px);
     border: 1px solid rgba(162, 150, 150, 0.2);
 
 }
 
 form {
-    /* display: flex;
-    flex-direction: column; */
-    /* width: 70%;
-    padding: 10px;
+    flex-direction: column;
+    display: flex;
     align-items: center;
     justify-content: center;
-    margin: 30px auto; */
-}
-
-.form-group {
-    width: 100%;
-    /* border: 1px solid white; */
+    width: 80%;
+    height: 80%;
 }
 
 .form-control {
-    /* margin: 10px; */
-    padding: 8px 12px;
     width: 100%;
+    margin: 10px;
     font-size: 1.2rem;
     border-radius: 8px;
-    border: 1px solid #556B2F;
-    background-color: #373A36;
+    border: 1px solid rgba(162, 150, 150, 0.2);
+    background: rgba(162, 150, 150, 0.12);
+    backdrop-filter: blur(3px);
+    -webkit-backdrop-filter: blur(3px);
+    padding: 8px 12px;
 }
 
 .btn-primary {
@@ -81,7 +77,9 @@ form {
     border: none;
     margin-top: 20px;
     animation: ease-in-out 4ms;
-
 }
 
-/* .main-content {} */
+.btn-primary:hover {
+    cursor: pointer;
+    transform: scale(1.1);
+}
