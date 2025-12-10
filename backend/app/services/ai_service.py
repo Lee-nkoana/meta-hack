@@ -16,9 +16,34 @@ class AIService:
     
     @property
     def is_configured(self) -> bool:
-        """Check if any AI service is configured"""
-        return bool(self.api_key or settings.HUGGINGFACE_API_KEY)
+        """Check if any AI service is configured (Ollama is always available as fallback)"""
+        return True
     
+    async def _call_ollama_api(self, prompt: str, system_message: str) -> Optional[str]:
+        """Call local Ollama API"""
+        url = f"{settings.OLLAMA_BASE_URL}/api/chat"
+        payload = {
+            "model": settings.OLLAMA_MODEL,
+            "messages": [
+                {"role": "system", "content": system_message},
+                {"role": "user", "content": prompt}
+            ],
+            "stream": False
+        }
+        
+        try:
+            async with httpx.AsyncClient() as client:
+                response = await client.post(url, json=payload, timeout=60.0)
+                if response.status_code == 200:
+                    data = response.json()
+                    return data.get("message", {}).get("content")
+                elif response.status_code == 404:
+                    return f"System: The Ollama model '{settings.OLLAMA_MODEL}' is not found. It might still be downloading. Please wait a few minutes."
+        except Exception as e:
+            print(f"Ollama API Error: {str(e)}")
+            return None
+        return None
+
     async def _call_huggingface_api(self, prompt: str, system_message: str) -> Optional[str]:
         """Call the Hugging Face Inference API"""
         if not settings.HUGGINGFACE_API_KEY:
@@ -60,11 +85,20 @@ class AIService:
             return None
 
     async def _call_api(self, prompt: str, system_message: str) -> Optional[str]:
-        """Call the AI API with error handling"""
-     
-        if settings.HUGGINGFACE_API_KEY:
-            return await self._call_huggingface_api(prompt, system_message)
+        """Call the AI API with prioritization: Ollama -> HuggingFace -> Together"""
+        
+        # Priority 1: Ollama (Local)
+        ollama_response = await self._call_ollama_api(prompt, system_message)
+        if ollama_response:
+            return ollama_response
             
+        # Priority 2: Hugging Face
+        if settings.HUGGINGFACE_API_KEY:
+            hf_response = await self._call_huggingface_api(prompt, system_message)
+            if hf_response:
+                return hf_response
+            
+        # Priority 3: Together AI (Meta AI)
         if not self.api_key:
             return None
         
@@ -133,6 +167,32 @@ Please provide helpful lifestyle suggestions:"""
         
         return await self._call_api(prompt, system_message)
     
+    async def chat_with_patient(self, message: str, context: Optional[str] = None) -> Optional[str]:
+        """Chat with patient using their medical context"""
+        system_message = """You are a helpful and empathetic medical assistant. You are chatting with a patient 
+        who uses the "Medical Records Bridge" app. 
+        
+        Your Role:
+        1. Answer the patient's questions based on their medical records context if provided.
+        2. Be supportive, clear, and reassuring.
+        3. Explain medical concepts in simple terms.
+        
+        CRITICAL RULES:
+        1. DO NOT provide medical advice, diagnosis, or prescribe treatments.
+        2. Always encourage the patient to consult their real healthcare provider for symptoms.
+        3. If you don't know the answer from the context, admit it.
+        """
+        
+        if context:
+            prompt = f"""Context from my medical records:
+{context}
+
+My Question: {message}"""
+        else:
+            prompt = message
+            
+        return await self._call_api(prompt, system_message)
+
     async def explain_medical_record(self, record_text: str, record_type: str = "doctor_note") -> dict:
         """Get both translation and suggestions for a medical record"""
         translation = await self.translate_medical_text(record_text)

@@ -261,6 +261,13 @@ class APIDemo:
         print(f"Deleting medical record ID: {self.record_id}...")
         self.make_request("DELETE", f"/api/records/{self.record_id}", use_auth=True)
         time.sleep(1)
+
+    def demo_delete_user(self):
+        """Demonstrate deleting the user account"""
+        self.print_section("15. Delete User Account (Cleanup)")
+        print("Deleting the demo user account...")
+        self.make_request("DELETE", "/api/users/me", use_auth=True)
+        time.sleep(1)
     
     def run_full_demo(self):
         """Run the complete API demonstration"""
@@ -303,6 +310,7 @@ class APIDemo:
         
         # Cleanup
         self.demo_delete_record()
+        self.demo_delete_user()
         
         # Final message
         self.print_header("Demo Complete!")

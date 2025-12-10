@@ -1,31 +1,362 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dashboard</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/login.css') }}">
-    <script>
-        // Check authentication immediately
-        const user = localStorage.getItem("currentUser");
-        if (!user) {
-            window.location.href = "/login";
+    <title>Medical Dashboard</title>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
+    <style>
+        :root {
+            --primary: #4F46E5;
+            --primary-dark: #4338CA;
+            --bg-dark: #111827;
+            --card-bg: #1F2937;
+            --text-main: #F9FAFB;
+            --text-muted: #9CA3AF;
         }
-    </script>
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Inter', sans-serif;
+        }
+
+        body {
+            background-color: var(--bg-dark);
+            color: var(--text-main);
+        }
+
+        .navbar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 1rem 2rem;
+            background-color: var(--card-bg);
+            border-bottom: 1px solid #374151;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 2rem auto;
+            padding: 0 1rem;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .card {
+            background-color: var(--card-bg);
+            padding: 1.5rem;
+            border-radius: 0.75rem;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        }
+
+        .card h3 {
+            font-size: 0.875rem;
+            color: var(--text-muted);
+            margin-bottom: 0.5rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .card .value {
+            font-size: 2rem;
+            font-weight: 700;
+            color: white;
+        }
+
+        .card .sub {
+            font-size: 0.875rem;
+            color: var(--text-muted);
+            margin-top: 0.5rem;
+        }
+
+        .section-title {
+            font-size: 1.25rem;
+            font-weight: 600;
+            margin-bottom: 1rem;
+            color: white;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 1rem;
+        }
+
+        th,
+        td {
+            text-align: left;
+            padding: 1rem;
+            border-bottom: 1px solid #374151;
+        }
+
+        th {
+            color: var(--text-muted);
+            font-weight: 500;
+            font-size: 0.875rem;
+        }
+
+        tr:hover {
+            background-color: rgba(255, 255, 255, 0.02);
+        }
+
+        .badge {
+            padding: 0.25rem 0.5rem;
+            border-radius: 9999px;
+            font-size: 0.75rem;
+            font-weight: 500;
+        }
+
+        .badge-green {
+            background-color: rgba(16, 185, 129, 0.2);
+            color: #34D399;
+        }
+
+        .badge-blue {
+            background-color: rgba(59, 130, 246, 0.2);
+            color: #60A5FA;
+        }
+
+        .btn-primary {
+            background-color: var(--primary);
+            color: white;
+            border: none;
+            padding: 0.5rem 1rem;
+            border-radius: 0.375rem;
+            cursor: pointer;
+            font-weight: 500;
+            transition: background 0.2s;
+        }
+
+        .btn-primary:hover {
+            background-color: var(--primary-dark);
+        }
+
+        .btn-logout {
+            background: transparent;
+            border: 1px solid #ef4444;
+            color: #ef4444;
+            margin-left: 1rem;
+        }
+
+        .btn-logout:hover {
+            background: #ef4444;
+            color: white;
+        }
+
+        .bar-container {
+            margin-top: 10px;
+            background: #374151;
+            height: 8px;
+            border-radius: 4px;
+            overflow: hidden;
+        }
+
+        .bar-fill {
+            height: 100%;
+            background: var(--primary);
+            transition: width 0.5s ease;
+            width: 0%;
+        }
+    </style>
 </head>
+
 <body>
-    <div style="padding: 2rem; color: white; text-align: center;">
-        <h1>Dashboard</h1>
-        <p>Welcome to Medical Records Bridge</p>
-        <p><i>(Dashboard under construction)</i></p>
-        <button onclick="logout()" class="btn-primary" style="margin-top: 20px;">Logout</button>
-    </div>
+    <nav class="navbar">
+        <div style="font-weight: 700; font-size: 1.25rem;">MedicalBridge 🏥</div>
+        <div style="display: flex; align-items: center;">
+            <a href="/chat" class="btn-primary"
+                style="margin-right: 1rem; text-decoration: none; padding: 0.5rem 1rem; font-size: 0.9rem;">💬 AI
+                Assistant</a>
+            <span id="userName" style="color: var(--text-muted); margin-right: 1rem;">Loading...</span>
+            <button onclick="logout()" class="btn-primary btn-logout">Logout</button>
+        </div>
+    </nav>
+
+    <main class="container">
+        <!-- Stats Row -->
+        <h2 class="section-title">Overview</h2>
+        <div class="grid">
+            <div class="card">
+                <h3>Total Records</h3>
+                <div class="value" id="totalRecords">-</div>
+                <div class="sub" id="recordsMonth">0 this month</div>
+            </div>
+            <div class="card">
+                <h3>AI Insights</h3>
+                <div class="value" id="aiUsage">-</div>
+                <div class="bar-container">
+                    <div class="bar-fill" id="aiBar"></div>
+                </div>
+                <div class="sub">Records with AI Analysis</div>
+            </div>
+            <div class="card">
+                <h3>Most Common</h3>
+                <div class="value" id="topType">-</div>
+                <div class="sub">Record Type</div>
+            </div>
+            <div class="card">
+                <h3>Member Since</h3>
+                <div class="value" id="memberSince">-</div>
+                <div class="sub" id="daysActive">0 days active</div>
+            </div>
+        </div>
+
+        <!-- Charts/Lists Row -->
+        <div class="grid" style="grid-template-columns: 2fr 1fr;">
+            <!-- Recent Records -->
+            <div class="card">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <h3 style="margin: 0; font-size: 1rem;">Recent Records</h3>
+                    <button class="btn-primary" style="padding: 0.25rem 0.75rem; font-size: 0.8rem;">View All</button>
+                </div>
+                <table id="recordsTable">
+                    <thead>
+                        <tr>
+                            <th>Title</th>
+                            <th>Type</th>
+                            <th>Date</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td colspan="4" style="text-align: center; color: var(--text-muted);">Loading...</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Distribution / Timeline -->
+            <div class="card">
+                <h3 style="font-size: 1rem; margin-bottom: 1rem;">Record Distribution</h3>
+                <div id="typeDistribution"></div>
+
+                <h3 style="font-size: 1rem; margin-top: 2rem; margin-bottom: 1rem;">Activity</h3>
+                <div id="timelineList" style="color: var(--text-muted); font-size: 0.9rem;"></div>
+            </div>
+        </div>
+    </main>
 
     <script>
+        // Auth Check
+        const currentUser = JSON.parse(localStorage.getItem("currentUser"));
+        if (!currentUser || !currentUser.access_token) {
+            window.location.href = "/login";
+        }
+
         function logout() {
             localStorage.removeItem("currentUser");
             window.location.href = "/login";
         }
+
+        async function fetchDashboardData() {
+            try {
+                const response = await fetch('/api/users/dashboard', {
+                    headers: { 'Authorization': `Bearer ${currentUser.access_token}` }
+                });
+
+                if (response.status === 401) {
+                    logout();
+                    return;
+                }
+
+                const data = await response.json();
+                renderDashboard(data);
+            } catch (error) {
+                console.error("Error fetching dashboard:", error);
+                document.querySelector('main').innerHTML = '<div style="color:red; text-align:center;">Failed to load dashboard data.</div>';
+            }
+        }
+
+        function renderDashboard(data) {
+            // User Profile
+            document.getElementById('userName').innerText = data.user_profile.full_name || data.user_profile.username;
+            document.getElementById('memberSince').innerText = new Date(data.user_profile.member_since).toLocaleDateString();
+
+            // Days Active Calc
+            const joined = new Date(data.user_profile.member_since);
+            const days = Math.floor((new Date() - joined) / (1000 * 60 * 60 * 24));
+            document.getElementById('daysActive').innerText = `${days} days active`;
+
+            // Stats
+            document.getElementById('totalRecords').innerText = data.statistics.total_records;
+            document.getElementById('recordsMonth').innerText = `${data.statistics.records_this_month} added this month`;
+
+            // AI Usage
+            const usageRate = Math.round(data.ai_insights.usage_rate);
+            document.getElementById('aiUsage').innerText = `${usageRate}%`;
+            document.getElementById('aiBar').style.width = `${usageRate}%`;
+
+            // Top Type
+            let topType = "N/A";
+            let maxCount = 0;
+            for (const [type, count] of Object.entries(data.records_by_type)) {
+                if (count > maxCount) { maxCount = count; topType = type; }
+            }
+            document.getElementById('topType').innerText = topType.replace('_', ' ');
+
+            // Recent Records Table
+            const tbody = document.querySelector('#recordsTable tbody');
+            tbody.innerHTML = '';
+            if (data.recent_records.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="4" style="text-align: center; color: #9CA3AF; padding: 2rem;">No records found</td></tr>';
+            } else {
+                data.recent_records.forEach(rec => {
+                    const row = document.createElement('tr');
+                    const date = new Date(rec.created_at).toLocaleDateString();
+
+                    let statusbadges = '';
+                    if (rec.has_translation) statusbadges += '<span class="badge badge-blue">Trans</span> ';
+                    if (rec.has_suggestions) statusbadges += '<span class="badge badge-green">Tips</span> ';
+                    if (!statusbadges) statusbadges = '<span style="color:#6B7280; font-size:0.8rem;">Pending</span>';
+
+                    row.innerHTML = `
+                        <td style="font-weight: 500;">${rec.title}</td>
+                        <td style="color: #9CA3AF; text-transform: capitalize;">${rec.record_type.replace('_', ' ')}</td>
+                        <td style="color: #9CA3AF;">${date}</td>
+                        <td>${statusbadges}</td>
+                    `;
+                    tbody.appendChild(row);
+                });
+            }
+
+            // Distribution List
+            const distDiv = document.getElementById('typeDistribution');
+            distDiv.innerHTML = '';
+            for (const [type, count] of Object.entries(data.records_by_type)) {
+                const item = document.createElement('div');
+                item.style.marginBottom = '0.5rem';
+                item.style.display = 'flex';
+                item.style.justifyContent = 'space-between';
+                item.innerHTML = `
+                    <span style="text-transform: capitalize; color: #D1D5DB;">${type.replace('_', ' ')}</span>
+                    <span style="color: white; font-weight: 600;">${count}</span>
+                `;
+                distDiv.appendChild(item);
+            }
+
+            // Timeline List (Last 3 entries)
+            const timelineDiv = document.getElementById('timelineList');
+            timelineDiv.innerHTML = '';
+            data.timeline.slice(-3).reverse().forEach(t => {
+                const item = document.createElement('div');
+                item.style.marginBottom = '0.5rem';
+                item.innerText = `${t.month}: ${t.count} records`;
+                timelineDiv.appendChild(item);
+            });
+        }
+
+        // Initialize
+        fetchDashboardData();
     </script>
 </body>
+
 </html>

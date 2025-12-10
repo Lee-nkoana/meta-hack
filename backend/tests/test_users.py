@@ -118,9 +118,10 @@ class TestDashboard:
         
         assert response.status_code == 200
         data = response.get_json()
-        assert data["total_records"] == 0
-        assert data["records_with_translation"] == 0
-        assert data["records_with_suggestions"] == 0
+        # Updated for enhanced schema structure
+        assert data["statistics"]["total_records"] == 0
+        assert data["ai_insights"]["translations_completed"] == 0
+        assert data["ai_insights"]["suggestions_generated"] == 0
         assert data["recent_records"] == []
     
     def test_dashboard_with_records(self, client, auth_headers, multiple_medical_records):
@@ -129,7 +130,7 @@ class TestDashboard:
         
         assert response.status_code == 200
         data = response.get_json()
-        assert data["total_records"] == 5
+        assert data["statistics"]["total_records"] == 5
         assert len(data["recent_records"]) == 5
     
     def test_dashboard_with_translations(self, client, auth_headers, test_medical_record, db_session):
@@ -142,9 +143,9 @@ class TestDashboard:
         
         assert response.status_code == 200
         data = response.get_json()
-        assert data["total_records"] == 1
-        assert data["records_with_translation"] == 1
-        assert data["records_with_suggestions"] == 1
+        assert data["statistics"]["total_records"] == 1
+        assert data["ai_insights"]["translations_completed"] == 1
+        assert data["ai_insights"]["suggestions_generated"] == 1
     
     def test_dashboard_no_auth(self, client):
         """Test dashboard without authentication"""

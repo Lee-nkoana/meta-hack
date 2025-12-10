@@ -73,7 +73,26 @@ def update_user_profile():
     
     db.commit()
     db.refresh(current_user)
+    db.commit()
+    db.refresh(current_user)
     return jsonify(user_response_schema.dump(current_user)), 200
+
+
+@bp.route('/me', methods=['DELETE'])
+@require_auth
+def delete_user_profile():
+    """Delete current user account"""
+    current_user = get_current_active_user()
+    db = get_db()
+    
+    # Delete all associated medical records first (though cascade might handle this)
+    db.query(MedicalRecord).filter(MedicalRecord.user_id == current_user.id).delete()
+    
+    # Delete the user
+    db.delete(current_user)
+    db.commit()
+    
+    return "", 204
 
 
 @bp.route('/dashboard', methods=['GET'])
@@ -86,17 +105,60 @@ def get_dashboard_stats():
     # Get all records for the user
     all_records = db.query(MedicalRecord).filter(
         MedicalRecord.user_id == current_user.id
-    ).all()
+    ).order_by(MedicalRecord.created_at.desc()).all()
     
+    # Basic Counters
     total_records = len(all_records)
     records_with_translation = sum(1 for r in all_records if r.translated_text)
     records_with_suggestions = sum(1 for r in all_records if r.lifestyle_suggestions)
     
-    # Get recent records (last 5)
-    recent_records_query = db.query(MedicalRecord).filter(
-        MedicalRecord.user_id == current_user.id
-    ).order_by(MedicalRecord.created_at.desc()).limit(5).all()
+    # Time-based filters
+    from datetime import datetime, timedelta, timezone
     
+    # Ensure now is timezone-aware (UTC)
+    now = datetime.now(timezone.utc)
+    month_start = datetime(now.year, now.month, 1, tzinfo=timezone.utc)
+    week_start = now - timedelta(days=7)
+    
+    def to_aware(dt):
+        if dt.tzinfo is None:
+            return dt.replace(tzinfo=timezone.utc)
+        return dt
+    
+    records_this_month = sum(1 for r in all_records if to_aware(r.created_at) >= month_start)
+    records_this_week = sum(1 for r in all_records if to_aware(r.created_at) >= week_start)
+    
+    oldest_record = all_records[-1].created_at.isoformat() if all_records else None
+    newest_record = all_records[0].created_at.isoformat() if all_records else None
+    
+    # Records by Type
+    records_by_type = {}
+    for r in all_records:
+        r_type = r.record_type or "other"
+        records_by_type[r_type] = records_by_type.get(r_type, 0) + 1
+        
+    # AI Insights
+    ai_insights = {
+        "translations_completed": records_with_translation,
+        "suggestions_generated": records_with_suggestions,
+        "pending_translations": total_records - records_with_translation,
+        "pending_suggestions": total_records - records_with_suggestions,
+        "usage_rate": (records_with_translation / total_records * 100) if total_records > 0 else 0
+    }
+    
+    # Timeline (Last 6 months)
+    timeline = {}
+    for r in all_records:
+        month_key = r.created_at.strftime("%Y-%m")
+        timeline[month_key] = timeline.get(month_key, 0) + 1
+    
+    # Convert timeline to sorted list
+    timeline_list = [
+        {"month": k, "count": v} 
+        for k, v in sorted(timeline.items())
+    ]
+    
+    # Recent Records
     recent_records = [
         {
             "id": record.id,
@@ -106,13 +168,26 @@ def get_dashboard_stats():
             "has_translation": record.translated_text is not None,
             "has_suggestions": record.lifestyle_suggestions is not None
         }
-        for record in recent_records_query
+        for record in all_records[:5]
     ]
     
     response = {
-        "total_records": total_records,
-        "records_with_translation": records_with_translation,
-        "records_with_suggestions": records_with_suggestions,
+        "user_profile": {
+            "full_name": current_user.full_name,
+            "email": current_user.email,
+            "member_since": current_user.created_at.isoformat(),
+            "record_count": total_records
+        },
+        "statistics": {
+            "total_records": total_records,
+            "records_this_week": records_this_week,
+            "records_this_month": records_this_month,
+            "oldest_record": oldest_record,
+            "newest_record": newest_record
+        },
+        "records_by_type": records_by_type,
+        "ai_insights": ai_insights,
+        "timeline": timeline_list,
         "recent_records": recent_records
     }
     

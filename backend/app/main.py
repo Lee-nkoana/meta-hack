@@ -1,7 +1,8 @@
-# Flask main application
-from flask import Flask, jsonify, render_template
+
+from flask import Flask, render_template, jsonify
 from flask_cors import CORS
 from flask_jwt_extended import JWTManager
+from flasgger import Swagger
 from app.config import settings
 from app.database import init_db, close_db
 
@@ -27,6 +28,44 @@ def create_app():
     
     # Initialize JWT Manager
     jwt = JWTManager(app)
+
+    # Swagger Configuration
+    swagger_config = {
+        "headers": [],
+        "specs": [
+            {
+                "endpoint": 'apispec_1',
+                "route": '/apispec_1.json',
+                "rule_filter": lambda rule: True,
+                "model_filter": lambda tag: True,
+            }
+        ],
+        "static_url_path": "/flasgger_static",
+        "swagger_ui": True,
+        "specs_route": "/docs"
+    }
+
+    swagger_template = {
+        "swagger": "2.0",
+        "info": {
+            "title": "Medical Records Bridge API",
+            "description": "API for processing medical records and generating insights",
+            "version": "1.0.0"
+        },
+        "securityDefinitions": {
+            "Bearer": {
+                "type": "apiKey",
+                "name": "Authorization",
+                "in": "header",
+                "description": "JWT Authorization header using the Bearer scheme. Example: \"Authorization: Bearer {token}\""
+            }
+        },
+        "security": [
+            {"Bearer": []}
+        ]
+    }
+
+    Swagger(app, config=swagger_config, template=swagger_template) # Initialize Flasgger
     
     # Register blueprints
     app.register_blueprint(auth.bp)
@@ -56,6 +95,10 @@ def create_app():
         """Register page"""
         return render_template("register.html")
 
+    @app.route("/chat")
+    def chat_page():
+        return render_template("chat.html")
+    
     @app.route("/dashboard")
     def dashboard():
         """Dashboard page"""

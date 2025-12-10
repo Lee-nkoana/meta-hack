@@ -118,11 +118,13 @@ def test_medical_record_data():
 @pytest.fixture
 def test_medical_record(db_session, test_user, test_medical_record_data):
     """Create a test medical record in the database"""
+    from datetime import datetime, timezone
     record = MedicalRecord(
         user_id=test_user.id,
         title=test_medical_record_data["title"],
         original_text=test_medical_record_data["original_text"],
-        record_type=test_medical_record_data["record_type"]
+        record_type=test_medical_record_data["record_type"],
+        created_at=datetime.now(timezone.utc)
     )
     db_session.add(record)
     db_session.commit()
@@ -133,12 +135,14 @@ def test_medical_record(db_session, test_user, test_medical_record_data):
 @pytest.fixture
 def multiple_medical_records(db_session, test_user):
     """Create multiple test medical records"""
+    from datetime import datetime, timezone
     records = [
         MedicalRecord(
             user_id=test_user.id,
             title=f"Record {i}",
             original_text=f"Test content {i}",
-            record_type="doctor_note"
+            record_type="doctor_note",
+            created_at=datetime.now(timezone.utc)
         )
         for i in range(5)
     ]

@@ -11,6 +11,11 @@ bp = Blueprint('ai', __name__, url_prefix='/api/ai')
 
 
 # Request/Response schemas
+class ChatRequestSchema(Schema):
+    """Request schema for AI chat"""
+    message = fields.Str(required=True)
+    include_context = fields.Bool(missing=True, default=True)
+
 class TranslateRequestSchema(Schema):
     """Request schema for text translation"""
     text = fields.Str(required=True)
@@ -28,9 +33,48 @@ class AIResponseSchema(Schema):
 
 
 # Initialize schemas
+chat_request_schema = ChatRequestSchema()
 translate_request_schema = TranslateRequestSchema()
 suggestions_request_schema = SuggestionsRequestSchema()
 ai_response_schema = AIResponseSchema()
+
+
+@bp.route('/chat', methods=['POST'])
+@require_auth
+def chat_with_ai():
+    """Chat with AI using medical context"""
+    current_user = get_current_active_user()
+    db = get_db()
+    
+    try:
+        data = chat_request_schema.load(request.get_json())
+    except ValidationError as err:
+        return jsonify({"errors": err.messages}), 400
+    
+    context = None
+    if data.get('include_context', True):
+        # Fetch last 5 records
+        recent_records = db.query(MedicalRecord).filter(
+            MedicalRecord.user_id == current_user.id
+        ).order_by(MedicalRecord.created_at.desc()).limit(5).all()
+        
+        if recent_records:
+            context = "\n\n".join([
+                f"Record ({r.created_at.strftime('%Y-%m-%d')}): {r.title} ({r.record_type})\n{r.original_text}"
+                for r in recent_records
+            ])
+
+    if not ai_service.is_configured:
+        return jsonify({
+            "error": "AI service is not configured."
+        }), 503
+        
+    response = asyncio.run(ai_service.chat_with_patient(data['message'], context))
+    
+    if not response:
+         return jsonify({"error": "Failed to generate response"}), 500
+         
+    return jsonify({"response": response}), 200
 
 
 @bp.route('/translate', methods=['POST'])
