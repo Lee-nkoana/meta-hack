@@ -15,7 +15,7 @@ class TestCreateMedicalRecord:
         )
         
         assert response.status_code == 201
-        data = response.json()
+        data = response.get_json()
         assert data["title"] == test_medical_record_data["title"]
         assert data["original_text"] == test_medical_record_data["original_text"]
         assert data["record_type"] == test_medical_record_data["record_type"]
@@ -39,7 +39,7 @@ class TestCreateMedicalRecord:
             headers=auth_headers
         )
         
-        assert response.status_code == 422
+        assert response.status_code == 400
     
     def test_create_record_missing_text(self, client, auth_headers):
         """Test creating record without original text"""
@@ -49,7 +49,7 @@ class TestCreateMedicalRecord:
             headers=auth_headers
         )
         
-        assert response.status_code == 422
+        assert response.status_code == 400
     
     def test_create_record_default_type(self, client, auth_headers):
         """Test creating record with default record type"""
@@ -60,7 +60,7 @@ class TestCreateMedicalRecord:
         )
         
         assert response.status_code == 201
-        assert response.json()["record_type"] == "doctor_note"
+        assert response.get_json()["record_type"] == "doctor_note"
 
 
 @pytest.mark.records
@@ -72,14 +72,14 @@ class TestListMedicalRecords:
         response = client.get("/api/records", headers=auth_headers)
         
         assert response.status_code == 200
-        assert response.json() == []
+        assert response.get_json() == []
     
     def test_list_records_with_data(self, client, auth_headers, multiple_medical_records):
         """Test listing records when user has multiple"""
         response = client.get("/api/records", headers=auth_headers)
         
         assert response.status_code == 200
-        data = response.json()
+        data = response.get_json()
         assert len(data) == 5
         assert all("id" in record for record in data)
         assert all("title" in record for record in data)
@@ -97,7 +97,7 @@ class TestListMedicalRecords:
         response = client.get("/api/records?skip=2&limit=2", headers=auth_headers)
         
         assert response.status_code == 200
-        data = response.json()
+        data = response.get_json()
         assert len(data) == 2
 
 
@@ -113,7 +113,7 @@ class TestGetMedicalRecord:
         )
         
         assert response.status_code == 200
-        data = response.json()
+        data = response.get_json()
         assert data["id"] == test_medical_record.id
         assert data["title"] == test_medical_record.title
         assert data["original_text"] == test_medical_record.original_text
@@ -144,7 +144,7 @@ class TestUpdateMedicalRecord:
         )
         
         assert response.status_code == 200
-        data = response.json()
+        data = response.get_json()
         assert data["title"] == "Updated Title"
         assert data["original_text"] == test_medical_record.original_text
     
@@ -162,7 +162,7 @@ class TestUpdateMedicalRecord:
         )
         
         assert response.status_code == 200
-        data = response.json()
+        data = response.get_json()
         assert data["original_text"] == "New text"
         assert data["translated_text"] is None
         assert data["lifestyle_suggestions"] is None

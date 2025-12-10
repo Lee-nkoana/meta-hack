@@ -1,11 +1,10 @@
 # Test configuration and fixtures
 import os
 import pytest
-from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
-from app.main import app
-from app.database import Base, get_db
+from app.main import create_app
+from app.database import Base, SessionLocal
 from app.models import User, MedicalRecord
 from app.utils.security import get_password_hash
 
@@ -19,15 +18,6 @@ engine = create_engine(
 TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 
-def override_get_db():
-    """Override database dependency for testing"""
-    try:
-        db = TestingSessionLocal()
-        yield db
-    finally:
-        db.close()
-
-
 @pytest.fixture(scope="function")
 def test_db():
     """Create test database and tables"""
@@ -37,16 +27,38 @@ def test_db():
 
 
 @pytest.fixture(scope="function")
-def client(test_db):
-    """Create test client with database override"""
-    app.dependency_overrides[get_db] = override_get_db
-    with TestClient(app) as test_client:
-        yield test_client
-    app.dependency_overrides.clear()
+def app(test_db):
+    """Create Flask app for testing"""
+    app = create_app()
+    app.config['TESTING'] = True
+    app.config['DATABASE_URL'] = SQLALCHEMY_TEST_DATABASE_URL
+    
+    # Patch the database session to use test database
+    from app import database
+    original_session = database.SessionLocal
+    database.SessionLocal = TestingSessionLocal
+    
+    yield app
+    
+    # Restore original session
+    database.SessionLocal = original_session
 
 
 @pytest.fixture(scope="function")
-def db_session(test_db):
+def client(app):
+    """Create test client with Flask app"""
+    return app.test_client()
+
+
+@pytest.fixture(scope="function")
+def app_context(app):
+    """Create app context for tests"""
+    with app.app_context():
+        yield
+
+
+@pytest.fixture(scope="function")
+def db_session(test_db, app_context):
     """Get database session for direct database access in tests"""
     session = TestingSessionLocal()
     yield session
@@ -80,16 +92,16 @@ def test_user(db_session, test_user_data):
 
 
 @pytest.fixture
-def auth_headers(client, test_user, test_user_data):
+def auth_headers(client, test_user, test_user_data, app_context):
     """Get authentication headers with JWT token"""
     response = client.post(
         "/api/auth/login",
-        data={
+        json={
             "username": test_user_data["username"],
             "password": test_user_data["password"]
         }
     )
-    token = response.json()["access_token"]
+    token = response.get_json()["access_token"]
     return {"Authorization": f"Bearer {token}"}
 
 

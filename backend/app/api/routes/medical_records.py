@@ -1,107 +1,120 @@
 # Medical records API routes
-from typing import Annotated, List
-from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy.orm import Session
+from flask import Blueprint, request, jsonify
+from marshmallow import ValidationError
 from app.database import get_db
-from app.schemas import (
-    MedicalRecordCreate,
-    MedicalRecordUpdate,
-    MedicalRecordResponse,
-    MedicalRecordList
+from app.schemas.medical_record import (
+    MedicalRecordCreateSchema,
+    MedicalRecordUpdateSchema,
+    MedicalRecordResponseSchema,
+    MedicalRecordListSchema
 )
 from app.models import User, MedicalRecord
-from app.api.deps import get_current_active_user
+from app.api.deps import require_auth, get_current_active_user
 
-router = APIRouter(prefix="/api/records", tags=["Medical Records"])
+bp = Blueprint('records', __name__, url_prefix='/api/records')
+
+# Initialize schemas
+record_create_schema = MedicalRecordCreateSchema()
+record_update_schema = MedicalRecordUpdateSchema()
+record_response_schema = MedicalRecordResponseSchema()
+record_list_schema = MedicalRecordListSchema(many=True)
 
 
-@router.post("", response_model=MedicalRecordResponse, status_code=status.HTTP_201_CREATED)
-def create_medical_record(
-    record_data: MedicalRecordCreate,
-    current_user: Annotated[User, Depends(get_current_active_user)],
-    db: Annotated[Session, Depends(get_db)]
-):
+@bp.route('', methods=['POST'])
+@require_auth
+def create_medical_record():
     """Create a new medical record"""
+    current_user = get_current_active_user()
+    db = get_db()
+    
+    try:
+        # Validate request data
+        record_data = record_create_schema.load(request.get_json())
+    except ValidationError as err:
+        return jsonify({"errors": err.messages}), 400
+    
     db_record = MedicalRecord(
         user_id=current_user.id,
-        title=record_data.title,
-        original_text=record_data.original_text,
-        record_type=record_data.record_type
+        title=record_data['title'],
+        original_text=record_data['original_text'],
+        record_type=record_data.get('record_type', 'doctor_note')
     )
     db.add(db_record)
     db.commit()
     db.refresh(db_record)
-    return db_record
+    return jsonify(record_response_schema.dump(db_record)), 201
 
 
-@router.get("", response_model=List[MedicalRecordList])
-def list_medical_records(
-    current_user: Annotated[User, Depends(get_current_active_user)],
-    db: Annotated[Session, Depends(get_db)],
-    skip: int = 0,
-    limit: int = 100
-):
+@bp.route('', methods=['GET'])
+@require_auth
+def list_medical_records():
     """List all medical records for the current user"""
+    current_user = get_current_active_user()
+    db = get_db()
+    
+    skip = request.args.get('skip', 0, type=int)
+    limit = request.args.get('limit', 100, type=int)
+    
     records = db.query(MedicalRecord).filter(
         MedicalRecord.user_id == current_user.id
     ).offset(skip).limit(limit).all()
     
     # Transform to list view
-    return [
-        MedicalRecordList(
-            id=record.id,
-            title=record.title,
-            record_type=record.record_type,
-            created_at=record.created_at,
-            has_translation=record.translated_text is not None,
-            has_suggestions=record.lifestyle_suggestions is not None
-        )
+    record_list = [
+        {
+            "id": record.id,
+            "title": record.title,
+            "record_type": record.record_type,
+            "created_at": record.created_at,
+            "has_translation": record.translated_text is not None,
+            "has_suggestions": record.lifestyle_suggestions is not None
+        }
         for record in records
     ]
+    
+    return jsonify(record_list_schema.dump(record_list)), 200
 
 
-@router.get("/{record_id}", response_model=MedicalRecordResponse)
-def get_medical_record(
-    record_id: int,
-    current_user: Annotated[User, Depends(get_current_active_user)],
-    db: Annotated[Session, Depends(get_db)]
-):
+@bp.route('/<int:record_id>', methods=['GET'])
+@require_auth
+def get_medical_record(record_id):
     """Get a specific medical record"""
+    current_user = get_current_active_user()
+    db = get_db()
+    
     record = db.query(MedicalRecord).filter(
         MedicalRecord.id == record_id,
         MedicalRecord.user_id == current_user.id
     ).first()
     
     if not record:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Medical record not found"
-        )
+        return jsonify({"error": "Medical record not found"}), 404
     
-    return record
+    return jsonify(record_response_schema.dump(record)), 200
 
 
-@router.put("/{record_id}", response_model=MedicalRecordResponse)
-def update_medical_record(
-    record_id: int,
-    record_data: MedicalRecordUpdate,
-    current_user: Annotated[User, Depends(get_current_active_user)],
-    db: Annotated[Session, Depends(get_db)]
-):
+@bp.route('/<int:record_id>', methods=['PUT'])
+@require_auth
+def update_medical_record(record_id):
     """Update a medical record"""
+    current_user = get_current_active_user()
+    db = get_db()
+    
     record = db.query(MedicalRecord).filter(
         MedicalRecord.id == record_id,
         MedicalRecord.user_id == current_user.id
     ).first()
     
     if not record:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Medical record not found"
-        )
+        return jsonify({"error": "Medical record not found"}), 404
+    
+    try:
+        # Validate request data
+        update_data = record_update_schema.load(request.get_json())
+    except ValidationError as err:
+        return jsonify({"errors": err.messages}), 400
     
     # Update fields
-    update_data = record_data.model_dump(exclude_unset=True)
     for field, value in update_data.items():
         setattr(record, field, value)
     
@@ -112,27 +125,24 @@ def update_medical_record(
     
     db.commit()
     db.refresh(record)
-    return record
+    return jsonify(record_response_schema.dump(record)), 200
 
 
-@router.delete("/{record_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_medical_record(
-    record_id: int,
-    current_user: Annotated[User, Depends(get_current_active_user)],
-    db: Annotated[Session, Depends(get_db)]
-):
+@bp.route('/<int:record_id>', methods=['DELETE'])
+@require_auth
+def delete_medical_record(record_id):
     """Delete a medical record"""
+    current_user = get_current_active_user()
+    db = get_db()
+    
     record = db.query(MedicalRecord).filter(
         MedicalRecord.id == record_id,
         MedicalRecord.user_id == current_user.id
     ).first()
     
     if not record:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Medical record not found"
-        )
+        return jsonify({"error": "Medical record not found"}), 404
     
     db.delete(record)
     db.commit()
-    return None
+    return '', 204

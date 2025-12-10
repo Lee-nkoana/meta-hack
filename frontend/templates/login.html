@@ -58,23 +58,25 @@
         Don't have an account? <a href="{{ url_for('register') }}">Register here.</a>
     </div>
 
-    <script src="{{ url_for('static', filename='api_connector.js') }}" defer></script>
+    <script src="{{ url_for('static', filename='js/api_connector.js') }}" defer></script>
     <script>
         document.getElementById("loginForm").addEventListener("submit", async (e) => {
             e.preventDefault();
 
             const data = {
-                email: e.target.email.value,
+                username: e.target.username.value,
                 password: e.target.password.value,
             };
 
             const result = await loginUser(data);
             console.log(result)
-            document.getElementById("loginMessage").innerText = result.message;
 
-            if (result.message === "Login successful") {
-                localStorage.setItem("currentUser", JSON.stringify(result.data));
+            if (result.access_token) {
+                document.getElementById("loginMessage").innerText = "Login successful";
+                localStorage.setItem("currentUser", JSON.stringify(result));
                 window.location.href = "/dashboard";
+            } else {
+                document.getElementById("loginMessage").innerText = result.error || "Login failed";
             }
         });
     </script>

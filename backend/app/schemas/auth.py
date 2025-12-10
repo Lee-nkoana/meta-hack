@@ -1,15 +1,14 @@
-# Authentication Pydantic schemas
-from pydantic import BaseModel
-from typing import Optional
+# Authentication Marshmallow schemas
+from marshmallow import Schema, fields
 
 
-class Token(BaseModel):
+class TokenSchema(Schema):
     """Schema for JWT token response"""
-    access_token: str
-    token_type: str = "bearer"
+    access_token = fields.Str(required=True)
+    token_type = fields.Str(missing="bearer", default="bearer")
 
 
-class TokenData(BaseModel):
+class TokenDataSchema(Schema):
     """Schema for token payload data"""
-    username: Optional[str] = None
-    user_id: Optional[int] = None
+    username = fields.Str(allow_none=True)
+    user_id = fields.Int(allow_none=True)

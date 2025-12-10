@@ -62,22 +62,36 @@
         Already have an account? <a href="{{ url_for('login') }}">Login here.</a>
     </div>
 
-    <script src="{{ url_for('static', filename='api_connector.js') }}" defer></script>
+    <script src="{{ url_for('static', filename='js/api_connector.js') }}" defer></script>
     <script>
         document.getElementById("registerForm").addEventListener("submit", async (e) => {
             e.preventDefault();
 
+            const password = e.target.password.value;
+            const confirm_password = e.target.confirm_password.value;
+
+            if (password !== confirm_password) {
+                alert("Passwords do not match!");
+                return;
+            }
+
             const data = {
                 username: e.target.username.value,
                 email: e.target.email.value,
-                password: e.target.password.value,
-                confirm_password: e.target.confirm_password.value
+                password: password
             };
 
             const result = await registerUser(data);
             console.log(result)
-            alert(result.message)
-            // document.getElementById("message").innerText = result.message;
+
+            if (result.id) {
+                alert("Registration successful! Please login.");
+                window.location.href = "/login";
+            } else if (result.errors) {
+                alert("Validation Error: " + JSON.stringify(result.errors));
+            } else {
+                alert(result.error || "Registration failed");
+            }
         });
     </script>
 </body>

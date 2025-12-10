@@ -11,7 +11,7 @@ class TestUserRegistration:
         response = client.post("/api/auth/register", json=test_user_data)
         
         assert response.status_code == 201
-        data = response.json()
+        data = response.get_json()
         assert data["email"] == test_user_data["email"]
         assert data["username"] == test_user_data["username"]
         assert data["full_name"] == test_user_data["full_name"]
@@ -25,7 +25,8 @@ class TestUserRegistration:
         response = client.post("/api/auth/register", json=test_user_data)
         
         assert response.status_code == 400
-        assert "username" in response.json()["detail"].lower()
+        data = response.get_json()
+        assert "username" in data.get("error", "").lower() or "username" in str(data.get("errors", "")).lower()
     
     def test_register_duplicate_email(self, client, test_user, test_user_data):
         """Test registration with existing email"""
@@ -34,7 +35,8 @@ class TestUserRegistration:
         response = client.post("/api/auth/register", json=new_user)
         
         assert response.status_code == 400
-        assert "email" in response.json()["detail"].lower()
+        data = response.get_json()
+        assert "email" in data.get("error", "").lower() or "email" in str(data.get("errors", "")).lower()
     
     def test_register_invalid_email(self, client, test_user_data):
         """Test registration with invalid email format"""
@@ -42,7 +44,7 @@ class TestUserRegistration:
         invalid_data["email"] = "not-an-email"
         response = client.post("/api/auth/register", json=invalid_data)
         
-        assert response.status_code == 422
+        assert response.status_code == 400
     
     def test_register_short_password(self, client, test_user_data):
         """Test registration with password too short"""
@@ -50,7 +52,7 @@ class TestUserRegistration:
         invalid_data["password"] = "12345"
         response = client.post("/api/auth/register", json=invalid_data)
         
-        assert response.status_code == 422
+        assert response.status_code == 400
     
     def test_register_short_username(self, client, test_user_data):
         """Test registration with username too short"""
@@ -58,7 +60,7 @@ class TestUserRegistration:
         invalid_data["username"] = "ab"
         response = client.post("/api/auth/register", json=invalid_data)
         
-        assert response.status_code == 422
+        assert response.status_code == 400
     
     def test_register_missing_fields(self, client):
         """Test registration with missing required fields"""
@@ -66,7 +68,7 @@ class TestUserRegistration:
             "email": "test@example.com"
         })
         
-        assert response.status_code == 422
+        assert response.status_code == 400
 
 
 @pytest.mark.auth
@@ -81,7 +83,7 @@ class TestUserLogin:
         })
         
         assert response.status_code == 200
-        data = response.json()
+        data = response.get_json()
         assert "access_token" in data
         assert data["token_type"] == "bearer"
         assert len(data["access_token"]) > 0
@@ -94,7 +96,8 @@ class TestUserLogin:
         })
         
         assert response.status_code == 401
-        assert "incorrect" in response.json()["detail"].lower()
+        data = response.get_json()
+        assert "incorrect" in data.get("error", "").lower()
     
     def test_login_nonexistent_user(self, client):
         """Test login with non-existent username"""
@@ -107,9 +110,9 @@ class TestUserLogin:
     
     def test_login_missing_credentials(self, client):
         """Test login with missing credentials"""
-        response = client.post("/api/auth/login", data={})
+        response = client.post("/api/auth/login", json={})
         
-        assert response.status_code == 422
+        assert response.status_code == 400
 
 
 @pytest.mark.auth
@@ -121,7 +124,7 @@ class TestCurrentUser:
         response = client.get("/api/auth/me", headers=auth_headers)
         
         assert response.status_code == 200
-        data = response.json()
+        data = response.get_json()
         assert data["email"] == test_user_data["email"]
         assert data["username"] == test_user_data["username"]
         assert data["id"] == test_user.id
@@ -138,4 +141,5 @@ class TestCurrentUser:
             "Authorization": "Bearer invalid_token"
         })
         
-        assert response.status_code == 401
+        # Flask-JWT-Extended returns 422 for invalid token format
+        assert response.status_code == 422

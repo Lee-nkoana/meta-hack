@@ -1,54 +1,57 @@
 # User profile and dashboard API routes
-from typing import Annotated
-from fastapi import APIRouter, Depends, HTTPException, status
-from pydantic import BaseModel
-from sqlalchemy.orm import Session
+from flask import Blueprint, request, jsonify
+from marshmallow import ValidationError
 from app.database import get_db
-from app.schemas import UserProfile, UserUpdate, UserResponse
+from app.schemas.user import UserProfileSchema, UserUpdateSchema, UserResponseSchema
 from app.models import User, MedicalRecord
-from app.api.deps import get_current_active_user
+from app.api.deps import require_auth, get_current_active_user
 from app.utils.security import get_password_hash
 
-router = APIRouter(prefix="/api/users", tags=["Users"])
+bp = Blueprint('users', __name__, url_prefix='/api/users')
+
+# Initialize schemas
+user_profile_schema = UserProfileSchema()
+user_update_schema = UserUpdateSchema()
+user_response_schema = UserResponseSchema()
 
 
-class DashboardStats(BaseModel):
-    """Dashboard statistics response"""
-    total_records: int
-    records_with_translation: int
-    records_with_suggestions: int
-    recent_records: list
-
-
-@router.get("/me", response_model=UserProfile)
-def get_user_profile(
-    current_user: Annotated[User, Depends(get_current_active_user)],
-    db: Annotated[Session, Depends(get_db)]
-):
+@bp.route('/me', methods=['GET'])
+@require_auth
+def get_user_profile():
     """Get current user profile with statistics"""
+    current_user = get_current_active_user()
+    db = get_db()
+    
     record_count = db.query(MedicalRecord).filter(
         MedicalRecord.user_id == current_user.id
     ).count()
     
-    return UserProfile(
-        id=current_user.id,
-        email=current_user.email,
-        username=current_user.username,
-        full_name=current_user.full_name,
-        created_at=current_user.created_at,
-        updated_at=current_user.updated_at,
-        record_count=record_count
-    )
+    # Create response dict
+    user_dict = {
+        "id": current_user.id,
+        "email": current_user.email,
+        "username": current_user.username,
+        "full_name": current_user.full_name,
+        "created_at": current_user.created_at,
+        "updated_at": current_user.updated_at,
+        "record_count": record_count
+    }
+    
+    return jsonify(user_profile_schema.dump(user_dict)), 200
 
 
-@router.put("/me", response_model=UserResponse)
-def update_user_profile(
-    user_data: UserUpdate,
-    current_user: Annotated[User, Depends(get_current_active_user)],
-    db: Annotated[Session, Depends(get_db)]
-):
+@bp.route('/me', methods=['PUT'])
+@require_auth
+def update_user_profile():
     """Update current user profile"""
-    update_data = user_data.model_dump(exclude_unset=True)
+    current_user = get_current_active_user()
+    db = get_db()
+    
+    try:
+        # Validate request data
+        update_data = user_update_schema.load(request.get_json())
+    except ValidationError as err:
+        return jsonify({"errors": err.messages}), 400
     
     # Check if email is being updated and if it's already taken
     if "email" in update_data:
@@ -57,10 +60,7 @@ def update_user_profile(
             User.id != current_user.id
         ).first()
         if existing_user:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Email already registered"
-            )
+            return jsonify({"error": "Email already registered"}), 400
     
     # Handle password update separately
     if "password" in update_data:
@@ -73,15 +73,16 @@ def update_user_profile(
     
     db.commit()
     db.refresh(current_user)
-    return current_user
+    return jsonify(user_response_schema.dump(current_user)), 200
 
 
-@router.get("/dashboard", response_model=DashboardStats)
-def get_dashboard_stats(
-    current_user: Annotated[User, Depends(get_current_active_user)],
-    db: Annotated[Session, Depends(get_db)]
-):
+@bp.route('/dashboard', methods=['GET'])
+@require_auth
+def get_dashboard_stats():
     """Get dashboard statistics for the current user"""
+    current_user = get_current_active_user()
+    db = get_db()
+    
     # Get all records for the user
     all_records = db.query(MedicalRecord).filter(
         MedicalRecord.user_id == current_user.id
@@ -108,9 +109,11 @@ def get_dashboard_stats(
         for record in recent_records_query
     ]
     
-    return DashboardStats(
-        total_records=total_records,
-        records_with_translation=records_with_translation,
-        records_with_suggestions=records_with_suggestions,
-        recent_records=recent_records
-    )
+    response = {
+        "total_records": total_records,
+        "records_with_translation": records_with_translation,
+        "records_with_suggestions": records_with_suggestions,
+        "recent_records": recent_records
+    }
+    
+    return jsonify(response), 200

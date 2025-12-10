@@ -1,40 +1,62 @@
 # Authentication API routes
-from typing import Annotated
-from fastapi import APIRouter, Depends, HTTPException, status
-from fastapi.security import OAuth2PasswordRequestForm
-from sqlalchemy.orm import Session
+from flask import Blueprint, request, jsonify, abort
+from marshmallow import ValidationError
 from app.database import get_db
-from app.schemas import UserCreate, UserResponse, Token
-from app.services import create_user, login_user
-from app.api.deps import get_current_active_user
-from app.models import User
+from app.schemas.auth import TokenSchema
+from app.schemas.user import UserCreateSchema, UserResponseSchema
+from app.services.auth import create_user, login_user
+from app.api.deps import require_auth, get_current_active_user
 
-router = APIRouter(prefix="/api/auth", tags=["Authentication"])
+bp = Blueprint('auth', __name__, url_prefix='/api/auth')
+
+# Initialize schemas
+user_create_schema = UserCreateSchema()
+user_response_schema = UserResponseSchema()
+token_schema = TokenSchema()
 
 
-@router.post("/register", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
-def register(
-    user_data: UserCreate,
-    db: Annotated[Session, Depends(get_db)]
-):
+@bp.route('/register', methods=['POST'])
+def register():
     """Register a new user"""
-    user = create_user(db, user_data)
-    return user
+    try:
+        # Validate request data
+        data = user_create_schema.load(request.get_json())
+    except ValidationError as err:
+        return jsonify({"errors": err.messages}), 400
+    
+    db = get_db()
+    
+    # Create user (service will handle validation errors)
+    try:
+        user = create_user(db, data)
+        return jsonify(user_response_schema.dump(user)), 201
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
 
 
-@router.post("/login", response_model=Token)
-def login(
-    form_data: Annotated[OAuth2PasswordRequestForm, Depends()],
-    db: Annotated[Session, Depends(get_db)]
-):
+@bp.route('/login', methods=['POST'])
+def login():
     """Login and receive JWT token"""
-    token = login_user(db, form_data.username, form_data.password)
-    return token
+    # Get form data (following OAuth2 pattern)
+    username = request.form.get('username') or request.get_json().get('username')
+    password = request.form.get('password') or request.get_json().get('password')
+    
+    if not username or not password:
+        return jsonify({"error": "Username and password required"}), 400
+    
+    db = get_db()
+    
+    # Login user (service will handle authentication errors)
+    try:
+        token_data = login_user(db, username, password)
+        return jsonify(token_schema.dump(token_data)), 200
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 401
 
 
-@router.get("/me", response_model=UserResponse)
-def get_current_user_info(
-    current_user: Annotated[User, Depends(get_current_active_user)]
-):
+@bp.route('/me', methods=['GET'])
+@require_auth
+def get_current_user_info():
     """Get current authenticated user information"""
-    return current_user
+    current_user = get_current_active_user()
+    return jsonify(user_response_schema.dump(current_user)), 200

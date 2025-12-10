@@ -1,47 +1,39 @@
-# User Pydantic schemas for validation and serialization
-from pydantic import BaseModel, EmailStr, Field
-from typing import Optional
-from datetime import datetime
+# User Marshmallow schemas for validation and serialization
+from marshmallow import Schema, fields, validate, ValidationError
 
 
-class UserBase(BaseModel):
+class UserBaseSchema(Schema):
     """Base user schema"""
-    email: EmailStr
-    username: str = Field(..., min_length=3, max_length=50)
-    full_name: Optional[str] = None
+    email = fields.Email(required=True)
+    username = fields.Str(required=True, validate=validate.Length(min=3, max=50))
+    full_name = fields.Str(allow_none=True)
 
 
-class UserCreate(UserBase):
+class UserCreateSchema(UserBaseSchema):
     """Schema for user registration"""
-    password: str = Field(..., min_length=6, max_length=100)
+    password = fields.Str(required=True, validate=validate.Length(min=6, max=100), load_only=True)
 
 
-class UserLogin(BaseModel):
+class UserLoginSchema(Schema):
     """Schema for user login"""
-    username: str
-    password: str
+    username = fields.Str(required=True)
+    password = fields.Str(required=True, load_only=True)
 
 
-class UserResponse(UserBase):
+class UserResponseSchema(UserBaseSchema):
     """Schema for user response (public info)"""
-    id: int
-    created_at: datetime
-    
-    class Config:
-        from_attributes = True
+    id = fields.Int(dump_only=True)
+    created_at = fields.DateTime(dump_only=True)
 
 
-class UserProfile(UserResponse):
+class UserProfileSchema(UserResponseSchema):
     """Schema for detailed user profile"""
-    updated_at: Optional[datetime] = None
-    record_count: Optional[int] = 0
-    
-    class Config:
-        from_attributes = True
+    updated_at = fields.DateTime(allow_none=True, dump_only=True)
+    record_count = fields.Int(missing=0, default=0)
 
 
-class UserUpdate(BaseModel):
+class UserUpdateSchema(Schema):
     """Schema for updating user profile"""
-    email: Optional[EmailStr] = None
-    full_name: Optional[str] = None
-    password: Optional[str] = Field(None, min_length=6, max_length=100)
+    email = fields.Email(allow_none=True)
+    full_name = fields.Str(allow_none=True)
+    password = fields.Str(allow_none=True, validate=validate.Length(min=6, max=100), load_only=True)

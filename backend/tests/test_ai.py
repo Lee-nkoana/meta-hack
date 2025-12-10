@@ -7,19 +7,20 @@ from unittest.mock import patch, AsyncMock
 class TestAITranslation:
     """Tests for AI translation endpoint"""
     
-    @patch('app.services.ai_service.AIService._call_api')
-    async def test_translate_success(self, mock_api, client, auth_headers):
+    @patch('app.api.routes.ai.ai_service.translate_medical_text', new_callable=AsyncMock)
+    def test_translate_success(self, mock_translate, client, auth_headers):
         """Test successful medical text translation"""
-        mock_api.return_value = "This means white blood cells, red blood cells, and platelets are normal."
+        with patch('app.api.routes.ai.ai_service.api_key', 'test_key'):
+            mock_translate.return_value = "This means white blood cells, red blood cells, and platelets are normal."
         
-        response = client.post(
-            "/api/ai/translate",
-            json={"text": "WBC, RBC, and PLT within normal limits"},
-            headers=auth_headers
-        )
+            response = client.post(
+                "/api/ai/translate",
+                json={"text": "WBC, RBC, and PLT within normal limits"},
+                headers=auth_headers
+            )
         
         assert response.status_code == 200
-        data = response.json()
+        data = response.get_json()
         assert "result" in data
         assert data["cached"] is False
     
@@ -40,26 +41,27 @@ class TestAITranslation:
             headers=auth_headers
         )
         
-        assert response.status_code == 422
+        assert response.status_code == 400
 
 
 @pytest.mark.ai
 class TestAISuggestions:
     """Tests for AI lifestyle suggestions endpoint"""
     
-    @patch('app.services.ai_service.AIService._call_api')
-    async def test_suggestions_success(self, mock_api, client, auth_headers):
+    @patch('app.api.routes.ai.ai_service.generate_lifestyle_suggestions', new_callable=AsyncMock)
+    def test_suggestions_success(self, mock_suggestions, client, auth_headers):
         """Test successful lifestyle suggestions generation"""
-        mock_api.return_value = "Consider regular exercise and balanced diet."
+        with patch('app.api.routes.ai.ai_service.api_key', 'test_key'):
+            mock_suggestions.return_value = "Consider regular exercise and balanced diet."
         
-        response = client.post(
-            "/api/ai/suggestions",
-            json={"condition": "High cholesterol"},
-            headers=auth_headers
-        )
+            response = client.post(
+                "/api/ai/suggestions",
+                json={"condition": "High cholesterol"},
+                headers=auth_headers
+            )
         
         assert response.status_code == 200
-        data = response.json()
+        data = response.get_json()
         assert "result" in data
         assert data["cached"] is False
     
@@ -80,28 +82,29 @@ class TestAISuggestions:
             headers=auth_headers
         )
         
-        assert response.status_code == 422
+        assert response.status_code == 400
 
 
 @pytest.mark.ai
 class TestAIExplainRecord:
     """Tests for AI record explanation endpoint"""
     
-    @patch('app.services.ai_service.AIService.explain_medical_record')
-    async def test_explain_record_success(self, mock_explain, client, auth_headers, test_medical_record):
+    @patch('app.api.routes.ai.ai_service.explain_medical_record', new_callable=AsyncMock)
+    def test_explain_record_success(self, mock_explain, client, auth_headers, test_medical_record):
         """Test successful record explanation"""
-        mock_explain.return_value = {
-            "translation": "Your blood test shows normal levels",
-            "suggestions": "Maintain healthy diet and exercise"
-        }
-        
-        response = client.post(
-            f"/api/ai/explain/{test_medical_record.id}",
-            headers=auth_headers
-        )
+        with patch('app.api.routes.ai.ai_service.api_key', 'test_key'):
+            mock_explain.return_value = {
+                "translation": "Your blood test shows normal levels",
+                "suggestions": "Maintain healthy diet and exercise"
+            }
+            
+            response = client.post(
+                f"/api/ai/explain/{test_medical_record.id}",
+                headers=auth_headers
+            )
         
         assert response.status_code == 200
-        data = response.json()
+        data = response.get_json()
         assert "translation" in data
         assert "suggestions" in data
         assert "cached" in data
@@ -119,31 +122,32 @@ class TestAIExplainRecord:
         )
         
         assert response.status_code == 200
-        data = response.json()
+        data = response.get_json()
         assert data["translation"] == "Cached translation"
         assert data["suggestions"] == "Cached suggestions"
         assert data["cached"] is True
     
-    @patch('app.services.ai_service.AIService.explain_medical_record')
-    async def test_explain_record_force_refresh(self, mock_explain, client, auth_headers, test_medical_record, db_session):
+    @patch('app.api.routes.ai.ai_service.explain_medical_record', new_callable=AsyncMock)
+    def test_explain_record_force_refresh(self, mock_explain, client, auth_headers, test_medical_record, db_session):
         """Test explanation with force refresh"""
         # Set cached data
         test_medical_record.translated_text = "Old translation"
         test_medical_record.lifestyle_suggestions = "Old suggestions"
         db_session.commit()
         
-        mock_explain.return_value = {
-            "translation": "New translation",
-            "suggestions": "New suggestions"
-        }
-        
-        response = client.post(
-            f"/api/ai/explain/{test_medical_record.id}?force_refresh=true",
-            headers=auth_headers
-        )
+        with patch('app.api.routes.ai.ai_service.api_key', 'test_key'):
+            mock_explain.return_value = {
+                "translation": "New translation",
+                "suggestions": "New suggestions"
+            }
+            
+            response = client.post(
+                f"/api/ai/explain/{test_medical_record.id}?force_refresh=true",
+                headers=auth_headers
+            )
         
         assert response.status_code == 200
-        data = response.json()
+        data = response.get_json()
         # Should call the AI service even with cached data
         assert mock_explain.called
     
@@ -171,7 +175,7 @@ class TestAIServiceUnavailable:
         """Test translation when AI service is not configured"""
         # This will fail if META_AI_API_KEY is not set
         # In test environment, it's expected to not be set
-        with patch('app.services.ai_service.AIService.api_key', None):
+        with patch('app.api.routes.ai.ai_service.api_key', None):
             response = client.post(
                 "/api/ai/translate",
                 json={"text": "Medical text"},
@@ -180,4 +184,4 @@ class TestAIServiceUnavailable:
             
             # Should return 503 Service Unavailable
             if response.status_code == 503:
-                assert "not configured" in response.json()["detail"].lower()
+                assert "not configured" in response.get_json().get("error", "").lower()

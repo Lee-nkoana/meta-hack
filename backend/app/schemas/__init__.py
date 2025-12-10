@@ -1,23 +1,29 @@
 # Schemas package
-from app.schemas.user import UserCreate, UserLogin, UserResponse, UserProfile, UserUpdate
-from app.schemas.medical_record import (
-    MedicalRecordCreate,
-    MedicalRecordUpdate,
-    MedicalRecordResponse,
-    MedicalRecordList
+from app.schemas.user import (
+    UserCreateSchema,
+    UserLoginSchema,
+    UserResponseSchema,
+    UserProfileSchema,
+    UserUpdateSchema
 )
-from app.schemas.auth import Token, TokenData
+from app.schemas.auth import TokenSchema, TokenDataSchema
+from app.schemas.medical_record import (
+    MedicalRecordCreateSchema,
+    MedicalRecordUpdateSchema,
+    MedicalRecordResponseSchema,
+    MedicalRecordListSchema
+)
 
 __all__ = [
-    "UserCreate",
-    "UserLogin",
-    "UserResponse",
-    "UserProfile",
-    "UserUpdate",
-    "MedicalRecordCreate",
-    "MedicalRecordUpdate",
-    "MedicalRecordResponse",
-    "MedicalRecordList",
-    "Token",
-    "TokenData",
+    "UserCreateSchema",
+    "UserLoginSchema",
+    "UserResponseSchema",
+    "UserProfileSchema",
+    "UserUpdateSchema",
+    "MedicalRecordCreateSchema",
+    "MedicalRecordUpdateSchema",
+    "MedicalRecordResponseSchema",
+    "MedicalRecordListSchema",
+    "TokenSchema",
+    "TokenDataSchema",
 ]

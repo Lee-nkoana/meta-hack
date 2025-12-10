@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/login.css') }}">
+    <script>
+        // Check authentication immediately
+        const user = localStorage.getItem("currentUser");
+        if (!user) {
+            window.location.href = "/login";
+        }
+    </script>
+</head>
+<body>
+    <div style="padding: 2rem; color: white; text-align: center;">
+        <h1>Dashboard</h1>
+        <p>Welcome to Medical Records Bridge</p>
+        <p><i>(Dashboard under construction)</i></p>
+        <button onclick="logout()" class="btn-primary" style="margin-top: 20px;">Logout</button>
+    </div>
+
+    <script>
+        function logout() {
+            localStorage.removeItem("currentUser");
+            window.location.href = "/login";
+        }
+    </script>
+</body>
+</html>

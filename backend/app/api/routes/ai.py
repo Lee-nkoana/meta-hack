@@ -1,86 +1,101 @@
 # AI-powered API routes for medical text translation and suggestions
-from typing import Annotated
-from fastapi import APIRouter, Depends, HTTPException, status
-from pydantic import BaseModel
-from sqlalchemy.orm import Session
+import asyncio
+from flask import Blueprint, request, jsonify
+from marshmallow import Schema, fields, ValidationError
 from app.database import get_db
 from app.models import User, MedicalRecord
-from app.api.deps import get_current_active_user
+from app.api.deps import require_auth, get_current_active_user
 from app.services.ai_service import ai_service
 
-router = APIRouter(prefix="/api/ai", tags=["AI Services"])
+bp = Blueprint('ai', __name__, url_prefix='/api/ai')
 
 
-class TranslateRequest(BaseModel):
+# Request/Response schemas
+class TranslateRequestSchema(Schema):
     """Request schema for text translation"""
-    text: str
+    text = fields.Str(required=True)
 
 
-class SuggestionsRequest(BaseModel):
+class SuggestionsRequestSchema(Schema):
     """Request schema for lifestyle suggestions"""
-    condition: str
+    condition = fields.Str(required=True)
 
 
-class AIResponse(BaseModel):
+class AIResponseSchema(Schema):
     """Response schema for AI operations"""
-    result: str | None
-    cached: bool = False
+    result = fields.Str(allow_none=True)
+    cached = fields.Bool(missing=False, default=False)
 
 
-@router.post("/translate", response_model=AIResponse)
-async def translate_medical_text(
-    request: TranslateRequest,
-    current_user: Annotated[User, Depends(get_current_active_user)]
-):
+# Initialize schemas
+translate_request_schema = TranslateRequestSchema()
+suggestions_request_schema = SuggestionsRequestSchema()
+ai_response_schema = AIResponseSchema()
+
+
+@bp.route('/translate', methods=['POST'])
+@require_auth
+def translate_medical_text():
     """Translate medical text to layman's terms on-demand"""
-    if not ai_service.api_key:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="AI service is not configured. Please set META_AI_API_KEY in environment variables."
-        )
+    current_user = get_current_active_user()
     
-    translation = await ai_service.translate_medical_text(request.text)
+    try:
+        data = translate_request_schema.load(request.get_json())
+    except ValidationError as err:
+        return jsonify({"errors": err.messages}), 400
+    
+    if not ai_service.is_configured:
+        return jsonify({
+            "error": "AI service is not configured. Please set META_AI_API_KEY in environment variables."
+        }), 503
+    
+    # Run async function in sync context
+    translation = asyncio.run(ai_service.translate_medical_text(data['text']))
     
     if translation is None:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to translate medical text. Please try again."
-        )
+        return jsonify({
+            "error": "Failed to translate medical text. Please try again."
+        }), 500
     
-    return AIResponse(result=translation, cached=False)
+    return jsonify(ai_response_schema.dump({"result": translation, "cached": False})), 200
 
 
-@router.post("/suggestions", response_model=AIResponse)
-async def get_lifestyle_suggestions(
-    request: SuggestionsRequest,
-    current_user: Annotated[User, Depends(get_current_active_user)]
-):
+@bp.route('/suggestions', methods=['POST'])
+@require_auth
+def get_lifestyle_suggestions():
     """Get lifestyle suggestions for a medical condition on-demand"""
-    if not ai_service.api_key:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="AI service is not configured. Please set META_AI_API_KEY in environment variables."
-        )
+    current_user = get_current_active_user()
     
-    suggestions = await ai_service.generate_lifestyle_suggestions(request.condition)
+    try:
+        data = suggestions_request_schema.load(request.get_json())
+    except ValidationError as err:
+        return jsonify({"errors": err.messages}), 400
+    
+    if not ai_service.is_configured:
+        return jsonify({
+            "error": "AI service is not configured. Please set META_AI_API_KEY in environment variables."
+        }), 503
+    
+    # Run async function in sync context
+    suggestions = asyncio.run(ai_service.generate_lifestyle_suggestions(data['condition']))
     
     if suggestions is None:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to generate lifestyle suggestions. Please try again."
-        )
+        return jsonify({
+            "error": "Failed to generate lifestyle suggestions. Please try again."
+        }), 500
     
-    return AIResponse(result=suggestions, cached=False)
+    return jsonify(ai_response_schema.dump({"result": suggestions, "cached": False})), 200
 
 
-@router.post("/explain/{record_id}")
-async def explain_medical_record(
-    record_id: int,
-    current_user: Annotated[User, Depends(get_current_active_user)],
-    db: Annotated[Session, Depends(get_db)],
-    force_refresh: bool = False
-):
+@bp.route('/explain/<int:record_id>', methods=['POST'])
+@require_auth
+def explain_medical_record(record_id):
     """Get AI explanation and suggestions for a specific medical record"""
+    current_user = get_current_active_user()
+    db = get_db()
+    
+    force_refresh = request.args.get('force_refresh', 'false').lower() == 'true'
+    
     # Get the medical record
     record = db.query(MedicalRecord).filter(
         MedicalRecord.id == record_id,
@@ -88,28 +103,24 @@ async def explain_medical_record(
     ).first()
     
     if not record:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Medical record not found"
-        )
+        return jsonify({"error": "Medical record not found"}), 404
     
     # Check if we have cached results and force_refresh is False
     if not force_refresh and record.translated_text and record.lifestyle_suggestions:
-        return {
+        return jsonify({
             "translation": record.translated_text,
             "suggestions": record.lifestyle_suggestions,
             "cached": True
-        }
+        }), 200
     
     # Check if AI service is configured
-    if not ai_service.api_key:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="AI service is not configured. Please set META_AI_API_KEY in environment variables."
-        )
+    if not ai_service.is_configured:
+        return jsonify({
+            "error": "AI service is not configured. Please set META_AI_API_KEY in environment variables."
+        }), 503
     
-    # Get AI explanations
-    result = await ai_service.explain_medical_record(record.original_text, record.record_type)
+    # Get AI explanations (run async in sync context)
+    result = asyncio.run(ai_service.explain_medical_record(record.original_text, record.record_type))
     
     # Cache the results
     if result["translation"]:
@@ -120,8 +131,8 @@ async def explain_medical_record(
     db.commit()
     db.refresh(record)
     
-    return {
+    return jsonify({
         "translation": result["translation"],
         "suggestions": result["suggestions"],
         "cached": False
-    }
+    }), 200

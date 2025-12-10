@@ -11,7 +11,7 @@ class TestUserProfile:
         response = client.get("/api/users/me", headers=auth_headers)
         
         assert response.status_code == 200
-        data = response.json()
+        data = response.get_json()
         assert data["email"] == test_user_data["email"]
         assert data["username"] == test_user_data["username"]
         assert data["full_name"] == test_user_data["full_name"]
@@ -23,7 +23,7 @@ class TestUserProfile:
         response = client.get("/api/users/me", headers=auth_headers)
         
         assert response.status_code == 200
-        data = response.json()
+        data = response.get_json()
         assert data["record_count"] == 5
     
     def test_get_profile_no_auth(self, client):
@@ -41,7 +41,7 @@ class TestUserProfile:
         )
         
         assert response.status_code == 200
-        data = response.json()
+        data = response.get_json()
         assert data["email"] == "newemail@example.com"
     
     def test_update_profile_full_name(self, client, auth_headers):
@@ -53,7 +53,7 @@ class TestUserProfile:
         )
         
         assert response.status_code == 200
-        data = response.json()
+        data = response.get_json()
         assert data["full_name"] == "New Name"
     
     def test_update_profile_password(self, client, auth_headers, test_user_data):
@@ -117,7 +117,7 @@ class TestDashboard:
         response = client.get("/api/users/dashboard", headers=auth_headers)
         
         assert response.status_code == 200
-        data = response.json()
+        data = response.get_json()
         assert data["total_records"] == 0
         assert data["records_with_translation"] == 0
         assert data["records_with_suggestions"] == 0
@@ -128,7 +128,7 @@ class TestDashboard:
         response = client.get("/api/users/dashboard", headers=auth_headers)
         
         assert response.status_code == 200
-        data = response.json()
+        data = response.get_json()
         assert data["total_records"] == 5
         assert len(data["recent_records"]) == 5
     
@@ -141,7 +141,7 @@ class TestDashboard:
         response = client.get("/api/users/dashboard", headers=auth_headers)
         
         assert response.status_code == 200
-        data = response.json()
+        data = response.get_json()
         assert data["total_records"] == 1
         assert data["records_with_translation"] == 1
         assert data["records_with_suggestions"] == 1

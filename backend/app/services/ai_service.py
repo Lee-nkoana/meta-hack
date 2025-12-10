@@ -14,8 +14,57 @@ class AIService:
         self.temperature = settings.META_AI_TEMPERATURE
         self.max_tokens = settings.META_AI_MAX_TOKENS
     
+    @property
+    def is_configured(self) -> bool:
+        """Check if any AI service is configured"""
+        return bool(self.api_key or settings.HUGGINGFACE_API_KEY)
+    
+    async def _call_huggingface_api(self, prompt: str, system_message: str) -> Optional[str]:
+        """Call the Hugging Face Inference API"""
+        if not settings.HUGGINGFACE_API_KEY:
+            return None
+            
+        headers = {
+            "Authorization": f"Bearer {settings.HUGGINGFACE_API_KEY}",
+            "Content-Type": "application/json"
+        }
+        
+        # Use a specific Llama 3 model URL
+        model_url = "https://api-inference.huggingface.co/models/meta-llama/Meta-Llama-3-8B-Instruct"
+        
+        payload = {
+            "inputs": f"<|begin_of_text|><|start_header_id|>system<|end_header_id|>\n\n{system_message}<|eot_id|><|start_header_id|>user<|end_header_id|>\n\n{prompt}<|eot_id|><|start_header_id|>assistant<|end_header_id|>\n\n",
+            "parameters": {
+                "max_new_tokens": self.max_tokens,
+                "temperature": self.temperature,
+                "return_full_text": False
+            }
+        }
+        
+        try:
+            async with httpx.AsyncClient() as client:
+                response = await client.post(
+                    model_url,
+                    headers=headers,
+                    json=payload,
+                    timeout=30.0
+                )
+                response.raise_for_status()
+                data = response.json()
+                # Hugging Face usually returns a list of result dicts
+                if isinstance(data, list) and len(data) > 0:
+                    return data[0].get("generated_text", "").strip()
+                return None
+        except Exception as e:
+            print(f"Hugging Face API Error: {str(e)}")
+            return None
+
     async def _call_api(self, prompt: str, system_message: str) -> Optional[str]:
-        """Call the Meta AI API with error handling"""
+        """Call the AI API with error handling"""
+     
+        if settings.HUGGINGFACE_API_KEY:
+            return await self._call_huggingface_api(prompt, system_message)
+            
         if not self.api_key:
             return None
         

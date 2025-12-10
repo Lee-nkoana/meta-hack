@@ -1,58 +1,77 @@
-# FastAPI main application
-from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
+# Flask main application
+from flask import Flask, jsonify, render_template
+from flask_cors import CORS
+from flask_jwt_extended import JWTManager
 from app.config import settings
-from app.database import init_db
+from app.database import init_db, close_db
+
+# Import blueprints
 from app.api.routes import auth, medical_records, ai, users
 
-# Initialize FastAPI app
-app = FastAPI(
-    title=settings.APP_NAME,
-    version=settings.APP_VERSION,
-    description="API for Medical Records Bridge - helping patients understand their medical data",
-    docs_url="/docs",
-    redoc_url="/redoc"
-)
 
-# Configure CORS
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=settings.BACKEND_CORS_ORIGINS,
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+def create_app():
+    """Create and configure Flask application"""
+    app = Flask(__name__, 
+                template_folder="../../frontend/templates",
+                static_folder="../../frontend/static")
+    
+    # Configure app
+    app.config['SECRET_KEY'] = settings.SECRET_KEY
+    app.config['JWT_SECRET_KEY'] = settings.JWT_SECRET_KEY
+    app.config['JWT_ACCESS_TOKEN_EXPIRES'] = settings.JWT_ACCESS_TOKEN_EXPIRES
+    
+    # Initialize CORS
+    CORS(app, 
+         resources={r"/api/*": {"origins": settings.BACKEND_CORS_ORIGINS}},
+         supports_credentials=True)
+    
+    # Initialize JWT Manager
+    jwt = JWTManager(app)
+    
+    # Register blueprints
+    app.register_blueprint(auth.bp)
+    app.register_blueprint(medical_records.bp)
+    app.register_blueprint(ai.bp)
+    app.register_blueprint(users.bp)
+    
+    # Register teardown function for database
+    app.teardown_appcontext(close_db)
+    
+    # Initialize database before first request
+    with app.app_context():
+        init_db()
+    
+    @app.route("/")
+    def root():
+        """Root endpoint - renders login page"""
+        return render_template("login.html")
+    
+    @app.route("/login")
+    def login():
+        """Login page"""
+        return render_template("login.html")
 
-# Include routers
-app.include_router(auth.router)
-app.include_router(medical_records.router)
-app.include_router(ai.router)
-app.include_router(users.router)
+    @app.route("/register")
+    def register():
+        """Register page"""
+        return render_template("register.html")
+
+    @app.route("/dashboard")
+    def dashboard():
+        """Dashboard page"""
+        return render_template("dashboard.html")
+    
+    @app.route("/health")
+    def health_check():
+        """Health check endpoint"""
+        return jsonify({"status": "healthy"})
+    
+    return app
 
 
-@app.on_event("startup")
-def on_startup():
-    """Initialize database on startup"""
-    init_db()
-
-
-@app.get("/")
-def root():
-    """Root endpoint"""
-    return {
-        "message": "Medical Records Bridge API",
-        "version": settings.APP_VERSION,
-        "docs": "/docs",
-        "status": "operational"
-    }
-
-
-@app.get("/health")
-def health_check():
-    """Health check endpoint"""
-    return {"status": "healthy"}
+# Create app instance
+app = create_app()
 
 
 if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000, reload=settings.DEBUG)
+    app.run(host="0.0.0.0", port=8000, debug=settings.DEBUG)
