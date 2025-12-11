@@ -30,6 +30,11 @@ class APIDemo:
         self.token: Optional[str] = None
         self.user_id: Optional[int] = None
         self.record_id: Optional[int] = None
+        self.stats = {
+            "passed": 0,
+            "failed": 0,
+            "failed_endpoints": []
+        }
     
     def print_header(self, text: str):
         """Print a formatted header"""
@@ -91,9 +96,19 @@ class APIDemo:
                 return None
             
             self.print_response(response)
+            
+            # Update stats
+            if response.status_code < 400:
+                self.stats["passed"] += 1
+            else:
+                self.stats["failed"] += 1
+                self.stats["failed_endpoints"].append(f"{method} {endpoint} (Status: {response.status_code})")
+                
             return response
         except Exception as e:
             print(f"{Colors.RED}Error: {str(e)}{Colors.END}")
+            self.stats["failed"] += 1
+            self.stats["failed_endpoints"].append(f"{method} {endpoint} (Error: {str(e)})")
             return None
     
     def demo_health_check(self):
@@ -318,6 +333,18 @@ class APIDemo:
         print(f"\n{Colors.CYAN}For interactive testing, visit:{Colors.END}")
         print(f"  Swagger UI: {self.base_url}/docs")
         print(f"  ReDoc: {self.base_url}/redoc\n")
+        
+        # Print Stats
+        print(f"\n{Colors.HEADER}{Colors.BOLD}Demo Statistics:{Colors.END}")
+        print(f"  Total Requests: {self.stats['passed'] + self.stats['failed']}")
+        print(f"  Passed: {Colors.GREEN}{self.stats['passed']}{Colors.END}")
+        print(f"  Failed: {Colors.RED}{self.stats['failed']}{Colors.END}")
+        
+        if self.stats["failed"] > 0:
+            print(f"\n{Colors.RED}Failed Endpoints:{Colors.END}")
+            for failure in self.stats["failed_endpoints"]:
+                print(f"  - {failure}")
+            print(f"\n{Colors.YELLOW}Please check the logs or configuration for the failed endpoints.{Colors.END}")
 
 
 def main():

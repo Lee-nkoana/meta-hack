@@ -6,7 +6,7 @@ A FastAPI-based backend service for the Medical Records Bridge application. This
 
 - **User Authentication**: Secure registration and login system with JWT token-based authentication
 - **Medical Records Management**: Full CRUD operations for storing and managing medical records
-- **AI-Powered Translation**: Convert medical terminology into layman's terms using Meta AI (Llama models)
+- **AI-Powered Translation**: Convert medical terminology into layman's terms using Hugging Face Inference API (or local Ollama fallback)
 - **Lifestyle Suggestions**: Generate personalized lifestyle tips based on medical conditions
 - **User Dashboard**: Statistics and profile management
 - **Interactive API Documentation**: Auto-generated Swagger UI and ReDoc documentation
@@ -19,13 +19,15 @@ A FastAPI-based backend service for the Medical Records Bridge application. This
 - **Pydantic**: Data validation using Python type hints
 - **JWT**: JSON Web Tokens for secure authentication
 - **Bcrypt**: Password hashing
-- **Meta AI**: AI-powered medical text analysis via Together AI API
+- **Hugging Face**: AI-powered medical text analysis (Primary)
+- **Ollama**: Local fallback for AI services
 
 ## Prerequisites
 
 - Python 3.9 or higher
 - pip (Python package installer)
-- (Optional) Meta AI API key from [Together AI](https://api.together.xyz/)
+- (Optional) Hugging Face API Token (for primary AI features)
+- (Optional) Ollama installed locally (for fallback AI features)
 
 ## Installation
 
@@ -50,14 +52,18 @@ Edit the `.env` file with your configuration:
 SECRET_KEY=your-secret-key-here
 DATABASE_URL=sqlite:///./medical_records.db
 
-# Optional: AI Features (works without this)
-META_AI_API_KEY=your-together-ai-api-key
+# Optional: AI Features (Primary)
+HUGGINGFACE_API_KEY=hf_your_token_here
+
+# Optional: AI Features (Fallback)
+OLLAMA_BASE_URL=http://localhost:11434
+OLLAMA_MODEL=llama3
 ```
 
 ### 3. Run the Server
 
 ```bash
-uvicorn app.main:app --reload
+flask run
 ```
 
 The server will start at `http://localhost:8000`
@@ -211,9 +217,11 @@ backend/
 
 ### Optional
 
-- `META_AI_API_KEY` - Together AI API key for AI features
-- `META_AI_MODEL` - Model to use (default: `meta-llama/Llama-3-70b-chat-hf`)
-- `META_AI_BASE_URL` - API base URL (default: `https://api.together.xyz/v1`)
+- `HUGGINGFACE_API_KEY` - Hugging Face user access token
+- `HUGGINGFACE_MODEL` - Model to use (default: `meta-llama/Meta-Llama-3-8B-Instruct`)
+- `HUGGINGFACE_BASE_URL` - API base URL (default: `https://api-inference.huggingface.co/models`)
+- `OLLAMA_BASE_URL` - URL for local Ollama instance (default: `http://localhost:11434`)
+- `OLLAMA_MODEL` - Local model to use (default: `llama3`)
 - `ACCESS_TOKEN_EXPIRE_MINUTES` - JWT token expiration time (default: 30)
 - `BACKEND_CORS_ORIGINS` - Allowed CORS origins (default: localhost ports)
 
@@ -259,13 +267,24 @@ DATABASE_URL=postgresql://user:password@localhost/dbname
 
 ## AI Integration
 
-The backend integrates with Meta AI (Llama models) via the Together AI API. AI features include:
+The backend integrates with **Hugging Face Inference API** as the primary AI provider, with **Ollama** as a local fallback.
+
+### How to obtain a Hugging Face Token (Quick Guide)
+
+1.  **Sign Up/Log In**: Go to [huggingface.co](https://huggingface.co/).
+2.  **Settings**: Click profile picture -> **Settings**.
+3.  **Access Tokens**: Select **Access Tokens** from the sidebar.
+4.  **Create Token**: Click **Create new token**, name it (e.g., `MedicalApp`), select **Read** permissions, and create.
+5.  **Configure**: Copy the token (starts with `hf_`) and paste it into your `.env`:
+    ```env
+    HUGGINGFACE_API_KEY=hf_...
+    ```
 
 - **Medical Translation**: Converts complex medical terminology into simple language
 - **Lifestyle Suggestions**: Generates personalized wellness tips (not medical advice)
-- **Response Caching**: AI responses are cached in the database to reduce API costs
+- **Response Caching**: AI responses are cached in the database to reduce API calls
 
-Note: The backend works without an API key, but AI features will be disabled.
+Note: The backend works without an API key if Ollama is running locally. If neither is available, AI features will be disabled.
 
 ## Development
 
@@ -299,8 +318,8 @@ Use the interactive Swagger UI at `/docs` or use curl/Postman to test endpoints 
 - Ensure you're including the JWT token in the Authorization header: `Authorization: Bearer YOUR_TOKEN`
 
 **AI Service Errors**
-- Check that `META_AI_API_KEY` is set in your `.env` file
-- Verify your API key is valid and has sufficient credits
+- Check that `HUGGINGFACE_API_KEY` is set in your `.env` file for remote inference
+- For local fallback, ensure Ollama is running (`ollama serve`) and the model is pulled (`ollama pull llama3`)
 
 ## Notes
 

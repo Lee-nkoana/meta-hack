@@ -38,7 +38,7 @@ class Settings:
         for origin in os.getenv(
             "BACKEND_CORS_ORIGINS", 
             "http://localhost:3000,http://localhost:8000,http://localhost:5173"
-        ).split(",")
+        ).strip("[]").split(",")
     ]
     
     # Meta AI Configuration
@@ -48,12 +48,20 @@ class Settings:
     META_AI_TEMPERATURE: float = float(os.getenv("META_AI_TEMPERATURE", "0.7"))
     META_AI_MAX_TOKENS: int = int(os.getenv("META_AI_MAX_TOKENS", "2000"))
     
-    # Hugging Face Configuration
     HUGGINGFACE_API_KEY: Optional[str] = os.getenv("HUGGINGFACE_API_KEY")
+    HUGGINGFACE_MODEL: str = os.getenv("HUGGINGFACE_MODEL", "meta-llama/Llama-3.2-11B-Vision-Instruct")
+    HUGGINGFACE_BASE_URL: str = os.getenv("HUGGINGFACE_BASE_URL", "https://router.huggingface.co/models")
     
     # Ollama Configuration
     OLLAMA_BASE_URL: str = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
     OLLAMA_MODEL: str = os.getenv("OLLAMA_MODEL", "llama3")
+
+    # Groq Configuration
+    GROQ_API_KEY: Optional[str] = os.getenv("GROQ_API_KEY")
+    GROQ_MODEL: str = os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile")
+    
+    # Legacy Together/Meta AI (Optional Fallback)
+    META_AI_API_KEY: Optional[str] = os.getenv("META_AI_API_KEY")
 
 
 settings = Settings()

@@ -1,16 +1,19 @@
 # AI service endpoint tests
 import pytest
 from unittest.mock import patch, AsyncMock
-
+from app.services.ai_service import ai_service
 
 @pytest.mark.ai
 class TestAITranslation:
     """Tests for AI translation endpoint"""
     
-    @patch('app.api.routes.ai.ai_service.translate_medical_text', new_callable=AsyncMock)
-    def test_translate_success(self, mock_translate, client, auth_headers):
+    def test_translate_success(self, client, auth_headers):
         """Test successful medical text translation"""
-        with patch('app.api.routes.ai.ai_service.api_key', 'test_key'):
+        with patch.object(ai_service, 'translate_medical_text', new_callable=AsyncMock) as mock_translate, \
+             patch.object(ai_service, 'meta_api_key', 'test_key'), \
+             patch.object(ai_service, 'hf_client', 'test_key'), \
+             patch.object(ai_service, 'groq_client', 'test_key'):
+            
             mock_translate.return_value = "This means white blood cells, red blood cells, and platelets are normal."
         
             response = client.post(
@@ -48,10 +51,11 @@ class TestAITranslation:
 class TestAISuggestions:
     """Tests for AI lifestyle suggestions endpoint"""
     
-    @patch('app.api.routes.ai.ai_service.generate_lifestyle_suggestions', new_callable=AsyncMock)
-    def test_suggestions_success(self, mock_suggestions, client, auth_headers):
+    def test_suggestions_success(self, client, auth_headers):
         """Test successful lifestyle suggestions generation"""
-        with patch('app.api.routes.ai.ai_service.api_key', 'test_key'):
+        with patch.object(ai_service, 'generate_lifestyle_suggestions', new_callable=AsyncMock) as mock_suggestions, \
+             patch.object(ai_service, 'meta_api_key', 'test_key'):
+            
             mock_suggestions.return_value = "Consider regular exercise and balanced diet."
         
             response = client.post(
@@ -89,10 +93,11 @@ class TestAISuggestions:
 class TestAIExplainRecord:
     """Tests for AI record explanation endpoint"""
     
-    @patch('app.api.routes.ai.ai_service.explain_medical_record', new_callable=AsyncMock)
-    def test_explain_record_success(self, mock_explain, client, auth_headers, test_medical_record):
+    def test_explain_record_success(self, client, auth_headers, test_medical_record):
         """Test successful record explanation"""
-        with patch('app.api.routes.ai.ai_service.api_key', 'test_key'):
+        with patch.object(ai_service, 'explain_medical_record', new_callable=AsyncMock) as mock_explain, \
+             patch.object(ai_service, 'meta_api_key', 'test_key'):
+            
             mock_explain.return_value = {
                 "translation": "Your blood test shows normal levels",
                 "suggestions": "Maintain healthy diet and exercise"
@@ -127,15 +132,16 @@ class TestAIExplainRecord:
         assert data["suggestions"] == "Cached suggestions"
         assert data["cached"] is True
     
-    @patch('app.api.routes.ai.ai_service.explain_medical_record', new_callable=AsyncMock)
-    def test_explain_record_force_refresh(self, mock_explain, client, auth_headers, test_medical_record, db_session):
+    def test_explain_record_force_refresh(self, client, auth_headers, test_medical_record, db_session):
         """Test explanation with force refresh"""
         # Set cached data
         test_medical_record.translated_text = "Old translation"
         test_medical_record.lifestyle_suggestions = "Old suggestions"
         db_session.commit()
         
-        with patch('app.api.routes.ai.ai_service.api_key', 'test_key'):
+        with patch.object(ai_service, 'explain_medical_record', new_callable=AsyncMock) as mock_explain, \
+             patch.object(ai_service, 'meta_api_key', 'test_key'):
+            
             mock_explain.return_value = {
                 "translation": "New translation",
                 "suggestions": "New suggestions"
@@ -173,9 +179,11 @@ class TestAIServiceUnavailable:
     
     def test_translate_no_api_key(self, client, auth_headers):
         """Test translation when AI service is not configured"""
-        # This will fail if META_AI_API_KEY is not set
-        # In test environment, it's expected to not be set
-        with patch('app.api.routes.ai.ai_service.api_key', None):
+        
+        with patch.object(ai_service, 'hf_client', None), \
+             patch.object(ai_service, 'groq_client', None), \
+             patch.object(ai_service, 'meta_api_key', None):
+             
             response = client.post(
                 "/api/ai/translate",
                 json={"text": "Medical text"},

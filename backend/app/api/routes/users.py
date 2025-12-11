@@ -61,6 +61,15 @@ def update_user_profile():
         ).first()
         if existing_user:
             return jsonify({"error": "Email already registered"}), 400
+            
+    # Check if username is being updated and if it's already taken
+    if "username" in update_data:
+        existing_user = db.query(User).filter(
+            User.username == update_data["username"],
+            User.id != current_user.id
+        ).first()
+        if existing_user:
+            return jsonify({"error": "Username already taken"}), 400
     
     # Handle password update separately
     if "password" in update_data:
@@ -93,6 +102,42 @@ def delete_user_profile():
     db.commit()
     
     return "", 204
+
+
+@bp.route('/export', methods=['GET'])
+@require_auth
+def export_user_data():
+    """Export all user data (UserProfile + MedicalRecords)"""
+    current_user = get_current_active_user()
+    db = get_db()
+    
+    # Get all records
+    records = db.query(MedicalRecord).filter(
+        MedicalRecord.user_id == current_user.id
+    ).all()
+    
+    records_data = []
+    for r in records:
+        records_data.append({
+            "id": r.id,
+            "title": r.title,
+            "original_text": r.original_text,
+            "translated_text": r.translated_text,
+            "lifestyle_suggestions": r.lifestyle_suggestions,
+            "record_type": r.record_type,
+            "created_at": r.created_at.isoformat() if r.created_at else None,
+            "has_image": bool(r.image_data)
+        })
+    
+    from datetime import datetime
+    
+    export_data = {
+        "user": user_profile_schema.dump(current_user),
+        "medical_records": records_data,
+        "export_date": datetime.now().isoformat()
+    }
+    
+    return jsonify(export_data), 200
 
 
 @bp.route('/dashboard', methods=['GET'])

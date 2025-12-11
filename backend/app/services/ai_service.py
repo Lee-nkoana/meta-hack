@@ -1,26 +1,43 @@
 # Meta AI service for medical text translation and lifestyle suggestions
 import httpx
 from typing import Optional
+from huggingface_hub import AsyncInferenceClient
+from groq import AsyncGroq
 from app.config import settings
 
 
 class AIService:
-    """Service for Meta AI integration (using Together AI API for Llama models)"""
+    """Service for Meta AI integration (using Hugging Face and Groq)"""
     
     def __init__(self):
-        self.api_key = settings.META_AI_API_KEY
-        self.base_url = settings.META_AI_BASE_URL
-        self.model = settings.META_AI_MODEL
-        self.temperature = settings.META_AI_TEMPERATURE
+        # Configuration
         self.max_tokens = settings.META_AI_MAX_TOKENS
+        self.temperature = settings.META_AI_TEMPERATURE
+        
+        # Initialize Hugging Face Client
+        self.hf_client = None
+        if settings.HUGGINGFACE_API_KEY:
+             self.hf_client = AsyncInferenceClient(
+                 model=settings.HUGGINGFACE_MODEL,
+                 token=settings.HUGGINGFACE_API_KEY
+             )
+
+        # Initialize Groq Client
+        self.groq_client = None
+        if settings.GROQ_API_KEY:
+            self.groq_client = AsyncGroq(api_key=settings.GROQ_API_KEY)
+            self.groq_model = settings.GROQ_MODEL
+
+        # Legacy Together AI fallback config
+        self.meta_api_key = settings.META_AI_API_KEY
     
     @property
     def is_configured(self) -> bool:
-        """Check if any AI service is configured (Ollama is always available as fallback)"""
-        return True
+        """Check if any AI service is configured"""
+        return bool(self.hf_client) or bool(self.groq_client) or bool(self.meta_api_key) or bool(settings.OLLAMA_BASE_URL)
     
     async def _call_ollama_api(self, prompt: str, system_message: str) -> Optional[str]:
-        """Call local Ollama API"""
+        """Call local Ollama API (Fallback)"""
         url = f"{settings.OLLAMA_BASE_URL}/api/chat"
         payload = {
             "model": settings.OLLAMA_MODEL,
@@ -30,177 +47,144 @@ class AIService:
             ],
             "stream": False
         }
-        
         try:
             async with httpx.AsyncClient() as client:
                 response = await client.post(url, json=payload, timeout=60.0)
                 if response.status_code == 200:
                     data = response.json()
                     return data.get("message", {}).get("content")
-                elif response.status_code == 404:
-                    return f"System: The Ollama model '{settings.OLLAMA_MODEL}' is not found. It might still be downloading. Please wait a few minutes."
         except Exception as e:
             print(f"Ollama API Error: {str(e)}")
             return None
         return None
 
-    async def _call_huggingface_api(self, prompt: str, system_message: str) -> Optional[str]:
-        """Call the Hugging Face Inference API"""
-        if not settings.HUGGINGFACE_API_KEY:
+    async def _call_huggingface_api(self, prompt: str, system_message: str, image_b64: Optional[str] = None) -> Optional[str]:
+        """Call Hugging Face using AsyncInferenceClient"""
+        if not self.hf_client:
             return None
             
-        headers = {
-            "Authorization": f"Bearer {settings.HUGGINGFACE_API_KEY}",
-            "Content-Type": "application/json"
-        }
+        messages = [{"role": "system", "content": system_message}]
         
-        # Use a specific Llama 3 model URL
-        model_url = "https://api-inference.huggingface.co/models/meta-llama/Meta-Llama-3-8B-Instruct"
-        
-        payload = {
-            "inputs": f"<|begin_of_text|><|start_header_id|>system<|end_header_id|>\n\n{system_message}<|eot_id|><|start_header_id|>user<|end_header_id|>\n\n{prompt}<|eot_id|><|start_header_id|>assistant<|end_header_id|>\n\n",
-            "parameters": {
-                "max_new_tokens": self.max_tokens,
-                "temperature": self.temperature,
-                "return_full_text": False
-            }
-        }
-        
+        if image_b64:
+            image_data_url = f"data:image/jpeg;base64,{image_b64}"
+            messages.append({
+                "role": "user",
+                "content": [
+                    {"type": "image_url", "image_url": {"url": image_data_url}},
+                    {"type": "text", "text": prompt}
+                ]
+            })
+        else:
+            messages.append({"role": "user", "content": prompt})
+            
         try:
-            async with httpx.AsyncClient() as client:
-                response = await client.post(
-                    model_url,
-                    headers=headers,
-                    json=payload,
-                    timeout=30.0
-                )
-                response.raise_for_status()
-                data = response.json()
-                # Hugging Face usually returns a list of result dicts
-                if isinstance(data, list) and len(data) > 0:
-                    return data[0].get("generated_text", "").strip()
-                return None
+            response = await self.hf_client.chat_completion(
+                messages=messages,
+                max_tokens=self.max_tokens,
+                temperature=self.temperature
+            )
+            if response.choices and len(response.choices) > 0:
+                return response.choices[0].message.content
+            return None
         except Exception as e:
-            print(f"Hugging Face API Error: {str(e)}")
+            print(f"Hugging Face Inference Error: {e}")
             return None
 
-    async def _call_api(self, prompt: str, system_message: str) -> Optional[str]:
-        """Call the AI API with prioritization: Ollama -> HuggingFace -> Together"""
-        
-        # Priority 1: Ollama (Local)
-        ollama_response = await self._call_ollama_api(prompt, system_message)
-        if ollama_response:
-            return ollama_response
+    async def _call_groq_api(self, prompt: str, system_message: str, image_b64: Optional[str] = None) -> Optional[str]:
+        """Call Groq API"""
+        if not self.groq_client:
+            return None
             
-        # Priority 2: Hugging Face
-        if settings.HUGGINGFACE_API_KEY:
-            hf_response = await self._call_huggingface_api(prompt, system_message)
+        messages = [{"role": "system", "content": system_message}]
+        
+        if image_b64:
+            # Groq implementation for Llama 3.2 Vision
+            image_data_url = f"data:image/jpeg;base64,{image_b64}"
+            messages.append({
+                "role": "user",
+                "content": [
+                    {"type": "image_url", "image_url": {"url": image_data_url}},
+                    {"type": "text", "text": prompt}
+                ]
+            })
+        else:
+            messages.append({"role": "user", "content": prompt})
+            
+        try:
+            response = await self.groq_client.chat.completions.create(
+                messages=messages,
+                model=self.groq_model,
+                temperature=self.temperature,
+                max_tokens=self.max_tokens
+            )
+            return response.choices[0].message.content
+        except Exception as e:
+            print(f"Groq API Error: {e}")
+            return None
+
+    async def _call_api(self, prompt: str, system_message: str, image_b64: Optional[str] = None) -> Optional[str]:
+        """Call the AI API with prioritization: Groq -> HuggingFace -> Ollama"""
+        
+        # Priority 1: Groq (Fastest, Smartest 70B model)
+        if self.groq_client:
+            groq_response = await self._call_groq_api(prompt, system_message, image_b64)
+            if groq_response:
+                return groq_response
+            print("Groq API failed, trying Hugging Face...")
+
+        # Priority 2: Hugging Face (Fallback)
+        if self.hf_client:
+            hf_response = await self._call_huggingface_api(prompt, system_message, image_b64)
             if hf_response:
                 return hf_response
+            print("Hugging Face API failed, trying Ollama...")
             
-        # Priority 3: Together AI (Meta AI)
-        if not self.api_key:
-            return None
-        
-        headers = {
-            "Authorization": f"Bearer {self.api_key}",
-            "Content-Type": "application/json"
-        }
-        
-        payload = {
-            "model": self.model,
-            "messages": [
-                {"role": "system", "content": system_message},
-                {"role": "user", "content": prompt}
-            ],
-            "temperature": self.temperature,
-            "max_tokens": self.max_tokens
-        }
-        
-        try:
-            async with httpx.AsyncClient() as client:
-                response = await client.post(
-                    f"{self.base_url}/chat/completions",
-                    headers=headers,
-                    json=payload,
-                    timeout=30.0
-                )
-                response.raise_for_status()
-                data = response.json()
-                return data["choices"][0]["message"]["content"]
-        except Exception as e:
-            print(f"AI API Error: {str(e)}")
-            return None
+        # Priority 3: Ollama (Local)
+        if not image_b64:
+             ollama_response = await self._call_ollama_api(prompt, system_message)
+             if ollama_response:
+                 return ollama_response
+            
+        return None
     
     async def translate_medical_text(self, medical_text: str) -> Optional[str]:
         """Translate medical jargon into layman's terms"""
-        system_message = """You are a helpful medical translator. Your job is to translate medical jargon 
-        and technical terms into simple, easy-to-understand language that patients can comprehend. 
-        Be clear, accurate, and empathetic. Do not provide medical advice."""
-        
-        prompt = f"""Please translate the following medical text into simple, easy-to-understand language 
-        that a patient without medical training can understand. Explain any medical terms, abbreviations, 
-        and concepts clearly:
-
-{medical_text}
-
-Provide a clear, patient-friendly explanation:"""
-        
+        system_message = "You are a helpful medical translator. Translate medical jargon into simple, patient-friendly language. Do not provide medical advice."
+        prompt = f"Translate and explain this medically:\n\n{medical_text}"
         return await self._call_api(prompt, system_message)
     
     async def generate_lifestyle_suggestions(self, medical_condition: str) -> Optional[str]:
-        """Generate lifestyle suggestions for a medical condition"""
-        system_message = """You are a helpful wellness advisor. Based on medical conditions described, 
-        you provide general lifestyle tips and suggestions that may help patients manage their condition. 
-        IMPORTANT: You do NOT provide medical advice, diagnoses, or treatment recommendations. 
-        You only suggest general lifestyle improvements like diet, exercise, sleep, stress management, etc. 
-        Always remind users to consult their healthcare provider."""
-        
-        prompt = f"""Based on the following medical information, suggest some general lifestyle tips 
-        that might help the patient. Focus on diet, exercise, sleep, stress management, and daily habits. 
-        Remember: DO NOT give medical advice or suggest treatments. Only provide general wellness suggestions.
-
-Medical Information:
-{medical_condition}
-
-Please provide helpful lifestyle suggestions:"""
-        
+        """Generate lifestyle suggestions"""
+        system_message = "You are a wellness advisor. Provide general lifestyle tips (diet, sleep, etc) for the condition. DO NOT give medical advice."
+        prompt = f"Suggest lifestyle tips for:\n\n{medical_condition}"
         return await self._call_api(prompt, system_message)
     
     async def chat_with_patient(self, message: str, context: Optional[str] = None) -> Optional[str]:
-        """Chat with patient using their medical context"""
-        system_message = """You are a helpful and empathetic medical assistant. You are chatting with a patient 
-        who uses the "Medical Records Bridge" app. 
+        """Chat with patient using context"""
+        system_message = "You are a helpful and empathetic medical assistant. Answer based on context. Do not diagnose."
         
-        Your Role:
-        1. Answer the patient's questions based on their medical records context if provided.
-        2. Be supportive, clear, and reassuring.
-        3. Explain medical concepts in simple terms.
-        
-        CRITICAL RULES:
-        1. DO NOT provide medical advice, diagnosis, or prescribe treatments.
-        2. Always encourage the patient to consult their real healthcare provider for symptoms.
-        3. If you don't know the answer from the context, admit it.
-        """
-        
-        if context:
-            prompt = f"""Context from my medical records:
-{context}
-
-My Question: {message}"""
-        else:
-            prompt = message
+        # RAG Retrieval
+        if not context:
+            try:
+                from app.services.knowledge_base import knowledge_base
+                docs = knowledge_base.query(message)
+                if docs: context = "\n---\n".join(docs)
+            except: pass
             
+        prompt = f"Context:\n{context}\n\nQuestion: {message}" if context else message
         return await self._call_api(prompt, system_message)
 
+    async def analyze_image(self, image_b64: str, prompt: str = "Describe this medical document") -> Optional[str]:
+        """Analyze a medical image using Hugging Face Vision capability"""
+        # We reuse the unified API helper which supports images
+        system_message = "You are an AI medical imaging assistant. Describe the image in detail. Do not diagnose."
+        return await self._call_api(prompt, system_message, image_b64=image_b64)
+
     async def explain_medical_record(self, record_text: str, record_type: str = "doctor_note") -> dict:
-        """Get both translation and suggestions for a medical record"""
-        translation = await self.translate_medical_text(record_text)
-        suggestions = await self.generate_lifestyle_suggestions(record_text)
-        
+        """Get both translation and suggestions"""
         return {
-            "translation": translation,
-            "suggestions": suggestions
+            "translation": await self.translate_medical_text(record_text),
+            "suggestions": await self.generate_lifestyle_suggestions(record_text)
         }
 
 

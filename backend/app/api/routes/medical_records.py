@@ -23,25 +23,94 @@ record_list_schema = MedicalRecordListSchema(many=True)
 @bp.route('', methods=['POST'])
 @require_auth
 def create_medical_record():
-    """Create a new medical record"""
+    """Create a new medical record (supports JSON or Multipart/Form-Data with image)"""
     current_user = get_current_active_user()
     db = get_db()
     
-    try:
-        # Validate request data
-        record_data = record_create_schema.load(request.get_json())
-    except ValidationError as err:
-        return jsonify({"errors": err.messages}), 400
-    
-    db_record = MedicalRecord(
-        user_id=current_user.id,
-        title=record_data['title'],
-        original_text=record_data['original_text'],
-        record_type=record_data.get('record_type', 'doctor_note')
-    )
+    # Handle Image Upload (Multipart)
+    if 'image' in request.files:
+        file = request.files['image']
+        title = request.form.get('title', 'Uploaded Medical Image')
+        record_type = request.form.get('record_type', 'doctor_note')
+        
+        if file.filename == '':
+            return jsonify({"error": "No selected file"}), 400
+            
+        import base64
+        # Read and encode image
+        image_bytes = file.read()
+        image_b64 = base64.b64encode(image_bytes).decode('utf-8')
+        
+        # Analyze image with AI
+        from app.services.ai_service import ai_service
+        # Use a prompt to extract text and details
+        analysis_prompt = "Extract all text from this medical document and summarize key medical details."
+        ai_result = "Image processing pending..." # Default if AI fails/not configured
+        
+        try:
+             # Run sync or via async helper (Flask is sync by default unless async route)
+             # Since ai_service methods are async, we need a way to run them.
+             # Ideally we should use `async def` route if using Quart/Async Flask, 
+             # but here we might need to rely on the event loop or simple run.
+             # For simplicity in standard Flask, we might need a sync wrapper or just hope the async run works if set up.
+             # However, assuming standard Flask sync route:
+             import asyncio
+             try:
+                 # Check if there is an existing loop
+                 loop = asyncio.get_event_loop()
+             except RuntimeError:
+                 loop = asyncio.new_event_loop()
+                 asyncio.set_event_loop(loop)
+                 
+             ai_text = loop.run_until_complete(ai_service.analyze_image(image_b64, analysis_prompt))
+             if ai_text:
+                 ai_result = ai_text
+        except Exception as e:
+            print(f"AI Image Analysis Failed: {e}")
+            
+        db_record = MedicalRecord(
+            user_id=current_user.id,
+            title=title,
+            original_text=ai_result, # Extracted text becomes the record content
+            image_data=image_b64,
+            record_type=record_type
+        )
+        
+    else:
+        # Handle Standard JSON
+        try:
+            # Validate request data
+            if request.is_json:
+                data = request.get_json()
+            else:
+                data = request.form.to_dict()
+                
+            record_data = record_create_schema.load(data)
+        except ValidationError as err:
+            return jsonify({"errors": err.messages}), 400
+        
+        db_record = MedicalRecord(
+            user_id=current_user.id,
+            title=record_data['title'],
+            original_text=record_data['original_text'],
+            record_type=record_data.get('record_type', 'doctor_note')
+        )
+
     db.add(db_record)
     db.commit()
     db.refresh(db_record)
+    
+    # Add to RAG Knowledge Base
+    try:
+        from app.services.knowledge_base import knowledge_base
+        knowledge_base.add_record(
+            record_id=str(db_record.id),
+            text=db_record.original_text,
+            meta={"title": db_record.title, "type": db_record.record_type, "user_id": current_user.id}
+        )
+    except Exception as e:
+        print(f"RAG Indexing Failed: {e}")
+        
     return jsonify(record_response_schema.dump(db_record)), 201
 
 

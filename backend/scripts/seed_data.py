@@ -57,5 +57,14 @@ def seed_data():
         else:
             print("Medical records already exist.")
 
+        print("\n" + "="*50)
+        print("SEED DATA COMPLETE")
+        print("="*50)
+        print("Test User Credentials:")
+        print("Email:    test@example.com")
+        print("Username: testuser")
+        print("Password: password123")
+        print("="*50 + "\n")
+
 if __name__ == "__main__":
     seed_data()

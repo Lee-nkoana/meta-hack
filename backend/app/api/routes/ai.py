@@ -1,4 +1,3 @@
-# AI-powered API routes for medical text translation and suggestions
 import asyncio
 from flask import Blueprint, request, jsonify
 from marshmallow import Schema, fields, ValidationError
@@ -42,37 +41,93 @@ ai_response_schema = AIResponseSchema()
 @bp.route('/chat', methods=['POST'])
 @require_auth
 def chat_with_ai():
-    """Chat with AI using medical context"""
+    """Chat with AI using medical context (supports JSON or Multipart with Image)"""
     current_user = get_current_active_user()
     db = get_db()
     
-    try:
-        data = chat_request_schema.load(request.get_json())
-    except ValidationError as err:
-        return jsonify({"errors": err.messages}), 400
+    # Handle Input (JSON vs Multipart)
+    message = ""
+    include_context = True
+    image_description = None
+    
+    if 'image' in request.files:
+        # Multipart request
+        message = request.form.get('message', '')
+        include_context = request.form.get('include_context', 'true').lower() == 'true'
+        
+        file = request.files['image']
+        if file.filename != '':
+            import base64
+            image_bytes = file.read()
+            image_b64 = base64.b64encode(image_bytes).decode('utf-8')
+            
+            # Use Vision model to describe the image for the chat context
+            # Run async analysis
+            prompt = "Describe this medical image in detail so I can answer questions about it."
+            try:
+                # Sync wrapper for async call
+                import asyncio
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+                image_description = loop.run_until_complete(ai_service.analyze_image(image_b64, prompt))
+                loop.close()
+            except Exception as e:
+                print(f"Chat Image Analysis Failed: {e}")
+                image_description = "Error analyzing image."
+    else:
+        # Standard JSON
+        try:
+            data = chat_request_schema.load(request.get_json())
+            message = data['message']
+            include_context = data.get('include_context', True)
+        except ValidationError as err:
+            return jsonify({"errors": err.messages}), 400
     
     context = None
-    if data.get('include_context', True):
+    context_parts = []
+    
+    # 1. Add Image Description if present
+    if image_description:
+        context_parts.append(f"User uploaded an image. Content/Description: {image_description}")
+    
+    # 2. Add Medical Records Context if requested
+    if include_context:
         # Fetch last 5 records
         recent_records = db.query(MedicalRecord).filter(
             MedicalRecord.user_id == current_user.id
         ).order_by(MedicalRecord.created_at.desc()).limit(5).all()
         
         if recent_records:
-            context = "\n\n".join([
+            records_text = "\n\n".join([
                 f"Record ({r.created_at.strftime('%Y-%m-%d')}): {r.title} ({r.record_type})\n{r.original_text}"
                 for r in recent_records
             ])
+            context_parts.append(records_text)
+            
+    if context_parts:
+        context = "\n\n---\n\n".join(context_parts)
 
     if not ai_service.is_configured:
         return jsonify({
             "error": "AI service is not configured."
         }), 503
         
-    response = asyncio.run(ai_service.chat_with_patient(data['message'], context))
+    # Run chat (handling async loop potentially)
+    # Note: re-using the loop or creating new one depending on environment
+    try:
+        import asyncio
+        try:
+             loop = asyncio.get_event_loop()
+        except RuntimeError:
+             loop = asyncio.new_event_loop()
+             asyncio.set_event_loop(loop)
+        response = loop.run_until_complete(ai_service.chat_with_patient(message, context))
+    except Exception as e:
+        print(f"Chat execution failed: {e}")
+        response = None
     
     if not response:
-         return jsonify({"error": "Failed to generate response"}), 500
+         return jsonify({"error": "AI service temporarily unavailable (Model Error). Please try again or switch model."}), 503
          
     return jsonify({"response": response}), 200
 

@@ -3,7 +3,7 @@
 PYTHON := venv/bin/python
 PIP := venv/bin/pip
 
-.PHONY: help install run test test-ai test-auth test-records test-users demo seed clean
+.PHONY: help install run test test-ai test-auth test-records test-users demo seed clean verify verify-ai build
 
 help: ## Show this help message
 	@echo 'Usage: make [target]'
@@ -40,3 +40,13 @@ seed: ## Populate the database with test data
 
 clean: ## Remove test data
 	$(PYTHON) scripts/clean_data.py
+
+verify: ## Run comprehensive system verification
+	$(PYTHON) scripts/verify_all.py
+
+verify-ai: ## Run AI service verification
+	$(PYTHON) scripts/verify_ai.py
+
+build: ## Build the Docker image
+	docker build -t meta-hack-backend .
+	

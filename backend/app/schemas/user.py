@@ -35,5 +35,6 @@ class UserProfileSchema(UserResponseSchema):
 class UserUpdateSchema(Schema):
     """Schema for updating user profile"""
     email = fields.Email(allow_none=True)
+    username = fields.Str(allow_none=True, validate=validate.Length(min=3, max=50))
     full_name = fields.Str(allow_none=True)
     password = fields.Str(allow_none=True, validate=validate.Length(min=6, max=100), load_only=True)

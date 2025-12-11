@@ -13,6 +13,7 @@ class MedicalRecord(Base):
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     title = Column(String, nullable=False)
     original_text = Column(Text, nullable=False)
+    image_data = Column(Text, nullable=True)  # Base64 encoded image data
     translated_text = Column(Text, nullable=True)  # Cached AI translation
     lifestyle_suggestions = Column(Text, nullable=True)  # Cached AI suggestions
     record_type = Column(String, default="doctor_note")  # doctor_note, lab_result, prescription, etc.
