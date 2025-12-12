@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MedBridge - Profile</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/profile.css') }}">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
+</head>
+
+<body>
+    <nav class="navbar">
+        <div style="font-weight: 700; font-size: 1.25rem;">MedBridge 🏥</div>
+        <div style="display: flex; align-items: center; gap: 1rem;">
+            <a href="/dashboard" class="nav-link">Dashboard</a>
+            <a href="/records" class="nav-link">Records</a>
+            <a href="/profile" class="nav-link active">Profile</a>
+            <a href="/chat" class="nav-link">💬 AI Assistant</a>
+            <span id="userName" style="color: var(--text-muted); margin-left: 1rem;">Loading...</span>
+            <button onclick="logout()" class="btn-primary btn-logout">Logout</button>
+        </div>
+    </nav>
+
+    <main class="container">
+        <div class="profile-header">
+            <div class="avatar">
+                <span id="avatarInitials">?</span>
+            </div>
+            <div class="profile-info">
+                <h1 id="displayName">Loading...</h1>
+                <p id="userEmail" class="email">email@example.com</p>
+                <p class="member-since">Member since <span id="joinDate">...</span></p>
+            </div>
+        </div>
+
+        <div class="profile-grid">
+            <!-- Account Information -->
+            <div class="card">
+                <h2>Account Information</h2>
+                <div class="info-group">
+                    <div class="info-item">
+                        <span class="label">Username</span>
+                        <span class="value" id="usernameDisplay">-</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="label">Full Name</span>
+                        <span class="value" id="fullNameDisplay">-</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="label">Email</span>
+                        <span class="value" id="emailDisplay">-</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="label">Account Created</span>
+                        <span class="value" id="createdAtDisplay">-</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Statistics -->
+            <div class="card">
+                <h2>Statistics</h2>
+                <div class="stats-grid">
+                    <div class="stat-box">
+                        <div class="stat-number" id="totalRecordsStat">-</div>
+                        <div class="stat-label">Total Records</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="stat-number" id="aiAnalysisStat">-</div>
+                        <div class="stat-label">AI Analyses</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="stat-number" id="thisMonthStat">-</div>
+                        <div class="stat-label">This Month</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="stat-number" id="daysActiveStat">-</div>
+                        <div class="stat-label">Days Active</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Activity Summary -->
+            <div class="card full-width">
+                <h2>Record Types Distribution</h2>
+                <div id="typeDistribution" class="distribution-list">
+                    <div class="loading">Loading distribution...</div>
+                </div>
+            </div>
+
+            <!-- Recent Activity -->
+            <div class="card full-width">
+                <h2>Recent Activity</h2>
+                <div id="recentActivity" class="activity-list">
+                    <div class="loading">Loading activity...</div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        // Auth Check
+        const currentUser = JSON.parse(localStorage.getItem("currentUser"));
+        if (!currentUser || !currentUser.access_token) {
+            window.location.href = "/login";
+        }
+
+        function logout() {
+            localStorage.removeItem("currentUser");
+            window.location.href = "/login";
+        }
+
+        // Fetch profile data
+        async function fetchProfileData() {
+            try {
+                // Fetch user profile
+                const userResponse = await fetch('/api/users/me', {
+                    headers: { 'Authorization': `Bearer ${currentUser.access_token}` }
+                });
+
+                if (userResponse.status === 401) {
+                    logout();
+                    return;
+                }
+
+                const userData = await userResponse.json();
+                displayUserInfo(userData);
+
+                // Fetch dashboard data for statistics
+                const dashResponse = await fetch('/api/users/dashboard', {
+                    headers: { 'Authorization': `Bearer ${currentUser.access_token}` }
+                });
+
+                if (dashResponse.ok) {
+                    const dashData = await dashResponse.json();
+                    displayStatistics(dashData);
+                }
+
+            } catch (error) {
+                console.error("Error fetching profile data:", error);
+            }
+        }
+
+        function displayUserInfo(user) {
+            // Display name and avatar
+            const fullName = user.full_name || user.username;
+            const initials = fullName.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
+
+            document.getElementById('displayName').textContent = fullName;
+            document.getElementById('userName').textContent = fullName;
+            document.getElementById('userEmail').textContent = user.email;
+            document.getElementById('avatarInitials').textContent = initials;
+
+            // Account info
+            document.getElementById('usernameDisplay').textContent = user.username;
+            document.getElementById('fullNameDisplay').textContent = user.full_name || 'Not set';
+            document.getElementById('emailDisplay').textContent = user.email;
+
+            const joinedDate = new Date(user.created_at);
+            const formattedDate = joinedDate.toLocaleDateString('en-US', {
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric'
+            });
+            document.getElementById('joinDate').textContent = formattedDate;
+            document.getElementById('createdAtDisplay').textContent = formattedDate;
+        }
+
+        function displayStatistics(data) {
+            // Statistics
+            document.getElementById('totalRecordsStat').textContent = data.statistics.total_records;
+
+            const aiCount = data.recent_records.filter(r => r.has_translation || r.has_suggestions).length;
+            document.getElementById('aiAnalysisStat').textContent = aiCount;
+
+            document.getElementById('thisMonthStat').textContent = data.statistics.records_this_month;
+
+            // Days active
+            const joined = new Date(data.user_profile.member_since);
+            const days = Math.floor((new Date() - joined) / (1000 * 60 * 60 * 24));
+            document.getElementById('daysActiveStat').textContent = days;
+
+            // Distribution
+            const distDiv = document.getElementById('typeDistribution');
+            distDiv.innerHTML = '';
+
+            const total = data.statistics.total_records;
+            for (const [type, count] of Object.entries(data.records_by_type)) {
+                const percentage = total > 0 ? Math.round((count / total) * 100) : 0;
+                const item = document.createElement('div');
+                item.className = 'dist-item';
+                item.innerHTML = `
+                    <div class="dist-info">
+                        <span class="dist-name">${type.replace('_', ' ')}</span>
+                        <span class="dist-count">${count} records (${percentage}%)</span>
+                    </div>
+                    <div class="dist-bar">
+                        <div class="dist-bar-fill" style="width: ${percentage}%"></div>
+                    </div>
+                `;
+                distDiv.appendChild(item);
+            }
+
+            // Recent Activity
+            const activityDiv = document.getElementById('recentActivity');
+            activityDiv.innerHTML = '';
+
+            if (data.recent_records.length === 0) {
+                activityDiv.innerHTML = '<p class="no-activity">No recent activity</p>';
+            } else {
+                data.recent_records.slice(0, 5).forEach(record => {
+                    const date = new Date(record.created_at);
+                    const timeAgo = getTimeAgo(date);
+
+                    const item = document.createElement('div');
+                    item.className = 'activity-item';
+                    item.innerHTML = `
+                        <div class="activity-icon">📄</div>
+                        <div class="activity-content">
+                            <div class="activity-title">${record.title}</div>
+                            <div class="activity-meta">
+                                <span>${record.record_type.replace('_', ' ')}</span>
+                                <span>•</span>
+                                <span>${timeAgo}</span>
+                            </div>
+                        </div>
+                    `;
+                    activityDiv.appendChild(item);
+                });
+            }
+        }
+
+        function getTimeAgo(date) {
+            const seconds = Math.floor((new Date() - date) / 1000);
+
+            if (seconds < 60) return 'Just now';
+            if (seconds < 3600) return `${Math.floor(seconds / 60)} minutes ago`;
+            if (seconds < 86400) return `${Math.floor(seconds / 3600)} hours ago`;
+            if (seconds < 604800) return `${Math.floor(seconds / 86400)} days ago`;
+
+            return date.toLocaleDateString();
+        }
+
+        // Initialize
+        fetchProfileData();
+    </script>
+</body>
+
+</html>

@@ -107,6 +107,16 @@ def create_app():
         """Dashboard page"""
         return render_template("dashboard.html")
     
+    @app.route("/records")
+    def records():
+        """Records page"""
+        return render_template("records.html")
+    
+    @app.route("/profile")
+    def profile():
+        """Profile page"""
+        return render_template("profile.html")
+    
     @app.route("/health")
     def health_check():
         """Health check endpoint"""

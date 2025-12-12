@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MedBridge - My Records</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/records.css') }}">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
+</head>
+
+<body>
+    <nav class="navbar">
+        <div style="font-weight: 700; font-size: 1.25rem;">MedBridge 🏥</div>
+        <div style="display: flex; align-items: center; gap: 1rem;">
+            <a href="/dashboard" class="nav-link">Dashboard</a>
+            <a href="/records" class="nav-link active">Records</a>
+            <a href="/profile" class="nav-link">Profile</a>
+            <a href="/chat" class="nav-link">💬 AI Assistant</a>
+            <span id="userName" style="color: var(--text-muted); margin-left: 1rem;">Loading...</span>
+            <button onclick="logout()" class="btn-primary btn-logout">Logout</button>
+        </div>
+    </nav>
+
+    <main class="container">
+        <div class="page-header">
+            <h1>My Medical Records</h1>
+            <div class="header-actions">
+                <input type="text" id="searchInput" placeholder="Search records..." class="search-input">
+                <select id="filterType" class="filter-select">
+                    <option value="">All Types</option>
+                    <option value="doctor_note">Doctor's Note</option>
+                    <option value="prescription">Prescription</option>
+                    <option value="lab_result">Lab Result</option>
+                    <option value="medical_history">Medical History</option>
+                    <option value="other">Other</option>
+                </select>
+                <select id="sortBy" class="filter-select">
+                    <option value="date_desc">Newest First</option>
+                    <option value="date_asc">Oldest First</option>
+                    <option value="title_asc">Title A-Z</option>
+                    <option value="title_desc">Title Z-A</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="records-stats">
+            <div class="stat-card">
+                <div class="stat-value" id="totalRecords">-</div>
+                <div class="stat-label">Total Records</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="withAI">-</div>
+                <div class="stat-label">With AI Analysis</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="recentRecords">-</div>
+                <div class="stat-label">This Month</div>
+            </div>
+        </div>
+
+        <div id="recordsContainer" class="records-grid">
+            <!-- Records will be loaded here -->
+            <div class="loading">Loading records...</div>
+        </div>
+
+        <div id="emptyState" class="empty-state" style="display: none;">
+            <div class="empty-icon">📋</div>
+            <h3>No records found</h3>
+            <p>Try adjusting your search or filters</p>
+        </div>
+    </main>
+
+    <!-- Record Detail Modal -->
+    <div id="recordModal" class="modal-overlay">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div class="modal-title" id="modalTitle">Record Details</div>
+                <button class="modal-close" onclick="closeModal()">×</button>
+            </div>
+            <div class="modal-body">
+                <div class="modal-info-row">
+                    <div class="modal-info-item">
+                        <span class="modal-label">Type</span>
+                        <span class="modal-value" id="modalType">-</span>
+                    </div>
+                    <div class="modal-info-item">
+                        <span class="modal-label">Date</span>
+                        <span class="modal-value" id="modalDate">-</span>
+                    </div>
+                </div>
+
+                <div id="modalAISection" style="display: none;">
+                    <div class="modal-section-title">✨ AI Analysis</div>
+
+                    <div id="modalTranslation" class="modal-ai-box" style="display: none;">
+                        <div style="font-weight: 600; margin-bottom: 0.5rem; color: var(--info);">Plain English Summary
+                        </div>
+                        <p id="modalTranslationText" style="margin: 0; font-size: 0.95rem;"></p>
+                    </div>
+
+                    <div id="modalSuggestions" class="modal-ai-box" style="display: none;">
+                        <div style="font-weight: 600; margin-bottom: 0.5rem; color: var(--success);">Health Tips & Next
+                            Steps</div>
+                        <p id="modalSuggestionsText" style="margin: 0; font-size: 0.95rem;"></p>
+                    </div>
+                </div>
+
+                <div class="modal-section">
+                    <div class="modal-section-title">Original Content</div>
+                    <div class="modal-text" id="modalContent"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Auth Check
+        const currentUser = JSON.parse(localStorage.getItem("currentUser"));
+        if (!currentUser || !currentUser.access_token) {
+            window.location.href = "/login";
+        }
+
+        function logout() {
+            localStorage.removeItem("currentUser");
+            window.location.href = "/login";
+        }
+
+        let allRecords = [];
+        let filteredRecords = [];
+
+        // Fetch all records
+        async function fetchAllRecords() {
+            try {
+                const response = await fetch('/api/records', {
+                    headers: { 'Authorization': `Bearer ${currentUser.access_token}` }
+                });
+
+                if (response.status === 401) {
+                    logout();
+                    return;
+                }
+
+                const data = await response.json();
+                // API returns a list directly, or handle if it's wrapped
+                allRecords = Array.isArray(data) ? data : (data.records || []);
+                filteredRecords = [...allRecords];
+
+                updateStats();
+                renderRecords();
+            } catch (error) {
+                console.error("Error fetching records:", error);
+                document.getElementById('recordsContainer').innerHTML =
+                    '<div class="error">Failed to load records. Please try again.</div>';
+            }
+        }
+
+        function updateStats() {
+            document.getElementById('totalRecords').textContent = allRecords.length;
+
+            const withAI = allRecords.filter(r => r.has_translation || r.has_suggestions).length;
+            document.getElementById('withAI').textContent = withAI;
+
+            const thisMonth = allRecords.filter(r => {
+                const recordDate = new Date(r.created_at);
+                const now = new Date();
+                return recordDate.getMonth() === now.getMonth() &&
+                    recordDate.getFullYear() === now.getFullYear();
+            }).length;
+            document.getElementById('recentRecords').textContent = thisMonth;
+
+            // Update user name
+            fetch('/api/users/me', {
+                headers: { 'Authorization': `Bearer ${currentUser.access_token}` }
+            }).then(r => r.json()).then(data => {
+                document.getElementById('userName').textContent = data.full_name || data.username;
+            }).catch(() => { });
+        }
+
+        function renderRecords() {
+            const container = document.getElementById('recordsContainer');
+            const emptyState = document.getElementById('emptyState');
+
+            if (filteredRecords.length === 0) {
+                container.style.display = 'none';
+                emptyState.style.display = 'flex';
+                return;
+            }
+
+            container.style.display = 'grid';
+            emptyState.style.display = 'none';
+
+            container.innerHTML = filteredRecords.map(record => {
+                const date = new Date(record.created_at).toLocaleDateString('en-US', {
+                    year: 'numeric',
+                    month: 'short',
+                    day: 'numeric'
+                });
+
+                let badges = '';
+                if (record.has_translation) badges += '<span class="badge badge-blue">Translation</span>';
+                if (record.has_suggestions) badges += '<span class="badge badge-green">AI Tips</span>';
+
+                const textPreview = record.original_text
+                    ? record.original_text.substring(0, 150) + (record.original_text.length > 150 ? '...' : '')
+                    : 'No content';
+
+                return `
+                    <div class="record-card" onclick="viewRecord(${record.id})">
+                        <div class="record-header">
+                            <h3>${record.title}</h3>
+                            <span class="record-type">${record.record_type.replace('_', ' ')}</span>
+                        </div>
+                        <div class="record-date">${date}</div>
+                        <div class="record-preview">${textPreview}</div>
+                        <div class="record-badges">${badges || '<span class="badge badge-gray">Pending</span>'}</div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function viewRecord(id) {
+            const record = allRecords.find(r => r.id === id);
+            if (!record) return;
+
+            // Populate Modal
+            document.getElementById('modalTitle').textContent = record.title;
+            document.getElementById('modalType').textContent = record.record_type.replace('_', ' ');
+
+            const date = new Date(record.created_at).toLocaleDateString('en-US', {
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+            document.getElementById('modalDate').textContent = date;
+            document.getElementById('modalContent').textContent = record.original_text;
+
+            // Handle AI Content
+            const aiSection = document.getElementById('modalAISection');
+            const translationBox = document.getElementById('modalTranslation');
+            const suggestionsBox = document.getElementById('modalSuggestions');
+
+            let hasAI = false;
+
+            if (record.has_translation || record.translated_text) {
+                // If the list request didn't return full text, we might need to fetch detail
+                // But for now let's assume if it says 'has_translation' we might need to fetch detail if missing
+                // Or maybe the list endpoint was simple. Let's fetch detail if needed.
+                // Actually, let's fetch the single record details to be sure we have everything
+                fetchRecordDetails(id);
+                hasAI = true;
+            } else {
+                translationBox.style.display = 'none';
+                suggestionsBox.style.display = 'none';
+                aiSection.style.display = 'none';
+            }
+
+            // Show modal
+            document.getElementById('recordModal').classList.add('active');
+            document.body.style.overflow = 'hidden'; // Prevent background scrolling
+        }
+
+        async function fetchRecordDetails(id) {
+            try {
+                const response = await fetch(`/api/records/${id}`, {
+                    headers: { 'Authorization': `Bearer ${currentUser.access_token}` }
+                });
+
+                if (response.ok) {
+                    const fullRecord = await response.json();
+
+                    const aiSection = document.getElementById('modalAISection');
+                    const translationBox = document.getElementById('modalTranslation');
+                    const suggestionsBox = document.getElementById('modalSuggestions');
+
+                    if (fullRecord.translated_text) {
+                        translationBox.style.display = 'block';
+                        document.getElementById('modalTranslationText').innerHTML = fullRecord.translated_text.replace(/\n/g, '<br>');
+                        aiSection.style.display = 'block';
+                    }
+
+                    if (fullRecord.lifestyle_suggestions) {
+                        suggestionsBox.style.display = 'block';
+                        document.getElementById('modalSuggestionsText').innerHTML = fullRecord.lifestyle_suggestions.replace(/\n/g, '<br>');
+                        aiSection.style.display = 'block';
+                    }
+                }
+            } catch (e) {
+                console.error("Failed to fetch details", e);
+            }
+        }
+
+        function closeModal() {
+            document.getElementById('recordModal').classList.remove('active');
+            document.body.style.overflow = '';
+        }
+
+        // Close modal on click outside
+        document.getElementById('recordModal').addEventListener('click', (e) => {
+            if (e.target.id === 'recordModal') {
+                closeModal();
+            }
+        });
+
+        // Close on escape key
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                closeModal();
+            }
+        });
+
+        // Search and filter functionality
+        document.getElementById('searchInput').addEventListener('input', (e) => {
+            applyFilters();
+        });
+
+        document.getElementById('filterType').addEventListener('change', (e) => {
+            applyFilters();
+        });
+
+        document.getElementById('sortBy').addEventListener('change', (e) => {
+            applyFilters();
+        });
+
+        function applyFilters() {
+            const searchTerm = document.getElementById('searchInput').value.toLowerCase();
+            const filterType = document.getElementById('filterType').value;
+            const sortBy = document.getElementById('sortBy').value;
+
+            // Filter
+            filteredRecords = allRecords.filter(record => {
+                const matchesSearch = !searchTerm ||
+                    record.title.toLowerCase().includes(searchTerm) ||
+                    record.original_text.toLowerCase().includes(searchTerm);
+
+                const matchesType = !filterType || record.record_type === filterType;
+
+                return matchesSearch && matchesType;
+            });
+
+            // Sort
+            filteredRecords.sort((a, b) => {
+                switch (sortBy) {
+                    case 'date_desc':
+                        return new Date(b.created_at) - new Date(a.created_at);
+                    case 'date_asc':
+                        return new Date(a.created_at) - new Date(b.created_at);
+                    case 'title_asc':
+                        return a.title.localeCompare(b.title);
+                    case 'title_desc':
+                        return b.title.localeCompare(a.title);
+                    default:
+                        return 0;
+                }
+            });
+
+            renderRecords();
+        }
+
+        // Initialize
+        fetchAllRecords();
+    </script>
+</body>
+
+</html>
