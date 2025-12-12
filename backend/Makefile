@@ -3,7 +3,7 @@
 PYTHON := venv/bin/python
 PIP := venv/bin/pip
 
-.PHONY: help install run test test-ai test-auth test-records test-users demo seed clean verify verify-ai build
+.PHONY: help install run test test-ai test-auth test-records test-users demo seed seed-medications clean verify verify-ai build
 
 help: ## Show this help message
 	@echo 'Usage: make [target]'
@@ -32,11 +32,28 @@ test-records: ## Run medical records tests
 test-users: ## Run user profile tests
 	./scripts/run_tests.sh tests/test_users.py
 
-demo: ## Run the interactive demo script
+demo: ## Run the interactive API demo script
 	./scripts/run_demo.sh
+
+demo-training: ## Run training data upload demo
+	$(PYTHON) scripts/demo_training.py
+
+batch-upload: ## Batch upload training images from folder
+	@echo "Usage: make batch-upload FOLDER=/path/to/images"
+	@echo "Example: make batch-upload FOLDER=./training_images TYPE=handwritten"
+	$(PYTHON) scripts/batch_upload_training.py $(FOLDER) $(if $(TYPE),--type $(TYPE))
+
+load-prescription-data: ## Load handwritten prescription training data
+	$(PYTHON) scripts/load_prescription_training.py --split Training --limit 100
+
+load-all-prescription-data: ## Load ALL prescription training data (Training, Testing, Validation)
+	$(PYTHON) scripts/load_prescription_training.py --all
 
 seed: ## Populate the database with test data
 	$(PYTHON) scripts/seed_data.py
+
+seed-medications: ## Populate medications table from JSON training data
+	$(PYTHON) scripts/seed_medications.py
 
 clean: ## Remove test data
 	$(PYTHON) scripts/clean_data.py

@@ -147,10 +147,29 @@ class AIService:
             
         return None
     
-    async def translate_medical_text(self, medical_text: str) -> Optional[str]:
-        """Translate medical jargon into layman's terms"""
+    async def translate_medical_text(self, medical_text: str, include_medications: bool = True) -> Optional[str]:
+        """Translate medical jargon into layman's terms with medication context"""
         system_message = "You are a helpful medical translator. Translate medical jargon into simple, patient-friendly language. Do not provide medical advice."
-        prompt = f"Translate and explain this medically:\n\n{medical_text}"
+        
+        # Add medication context if requested
+        medication_context = ""
+        if include_medications:
+            try:
+                from app.database import get_db
+                from app.services.medication_service import medication_service
+                db = get_db()
+                medications_found = medication_service.get_medication_context(db, medical_text)
+                
+                if medications_found:
+                    medication_context = "\n\nMedications mentioned:\n"
+                    for med in medications_found:
+                        medication_context += f"- {med['name']}: {med['uses']}\n"
+                        if med['discontinued']:
+                            medication_context += f"  WARNING: This medication is DISCONTINUED. {med['discontinuation_reason'] or ''}\n"
+            except Exception as e:
+                print(f"Medication context error: {e}")
+        
+        prompt = f"Translate and explain this medically:{medication_context}\n\n{medical_text}"
         return await self._call_api(prompt, system_message)
     
     async def generate_lifestyle_suggestions(self, medical_condition: str) -> Optional[str]:
@@ -160,7 +179,7 @@ class AIService:
         return await self._call_api(prompt, system_message)
     
     async def chat_with_patient(self, message: str, context: Optional[str] = None) -> Optional[str]:
-        """Chat with patient using context"""
+        """Chat with patient using context and medication knowledge"""
         system_message = "You are a helpful and empathetic medical assistant. Answer based on context. Do not diagnose."
         
         # RAG Retrieval
@@ -170,6 +189,26 @@ class AIService:
                 docs = knowledge_base.query(message)
                 if docs: context = "\n---\n".join(docs)
             except: pass
+        
+        # Add medication context
+        try:
+            from app.database import get_db
+            from app.services.medication_service import medication_service
+            db = get_db()
+            medications_found = medication_service.get_medication_context(db, message)
+            
+            if medications_found:
+                med_context = "\n\nRelevant Medications:\n"
+                for med in medications_found:
+                    med_context += f"- {med['name']}: {med['uses']}\n"
+                    if med['side_effects']:
+                        med_context += f"  Side effects: {med['side_effects']}\n"
+                    if med['discontinued']:
+                        med_context += f"  ⚠️ DISCONTINUED: {med['discontinuation_reason'] or 'No longer available'}\n"
+                
+                context = (context or "") + med_context
+        except Exception as e:
+            print(f"Medication lookup error in chat: {e}")
             
         prompt = f"Context:\n{context}\n\nQuestion: {message}" if context else message
         return await self._call_api(prompt, system_message)
@@ -179,13 +218,44 @@ class AIService:
         # We reuse the unified API helper which supports images
         system_message = "You are an AI medical imaging assistant. Describe the image in detail. Do not diagnose."
         return await self._call_api(prompt, system_message, image_b64=image_b64)
+    
+    async def analyze_medical_note_with_medications(self, image_b64: str) -> dict:
+        """
+        Analyze medical note image with OCR and medication detection
+        Returns extracted text, medications found, and AI analysis
+        """
+        from app.services.ocr_service import ocr_service
+        from app.database import get_db
+        from app.services.medication_service import medication_service
+        
+        # Extract text using OCR
+        extracted_text, confidence = ocr_service.extract_text_from_image(image_b64)
+        
+        # Find medications
+        medications_found = []
+        if extracted_text:
+            db = get_db()
+            medications_found = medication_service.get_medication_context(db, extracted_text)
+        
+        # Get AI translation with medication context
+        translation = None
+        if extracted_text:
+            translation = await self.translate_medical_text(extracted_text, include_medications=True)
+        
+        return {
+            "extracted_text": extracted_text,
+            "ocr_confidence": confidence,
+            "medications_found": medications_found,
+            "ai_translation": translation
+        }
 
     async def explain_medical_record(self, record_text: str, record_type: str = "doctor_note") -> dict:
-        """Get both translation and suggestions"""
+        """Get both translation and suggestions with medication awareness"""
         return {
-            "translation": await self.translate_medical_text(record_text),
+            "translation": await self.translate_medical_text(record_text, include_medications=True),
             "suggestions": await self.generate_lifestyle_suggestions(record_text)
         }
+
 
 
 # Create singleton instance

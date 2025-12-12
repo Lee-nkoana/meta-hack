@@ -4,14 +4,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Medical Dashboard</title>
+    <title>MedBridge Dashboard</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard.css') }}">
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
 </head>
 
 <body>
     <nav class="navbar">
-        <div style="font-weight: 700; font-size: 1.25rem;">MedicalBridge 🏥</div>
+        <div style="font-weight: 700; font-size: 1.25rem;">MedBridge 🏥</div>
         <div style="display: flex; align-items: center;">
             <a href="/chat" class="btn-primary"
                 style="margin-right: 1rem; text-decoration: none; padding: 0.5rem 1rem; font-size: 0.9rem;">💬 AI
@@ -87,16 +87,22 @@
             </div>
         </div>
         <h2>Add Medical Record</h2>
-        <form id="addMedicalForm">
+        <form id="addMedicalForm" enctype="multipart/form-data">
             <label for="title">Title</label>
             <input type="text" id="title" name="title" placeholder="Enter record title" required>
+
+            <label for="record_type">Type of Note</label>
+            <select id="record_type" name="record_type" required>
+                <option value="doctor_note">Doctor's Note</option>
+                <option value="prescription">Prescription</option>
+                <option value="lab_result">Lab Result</option>
+                <option value="medical_history">Medical History</option>
+                <option value="other">Other</option>
+            </select>
 
             <label for="original_text">Medical Notes</label>
             <textarea id="original_text" name="original_text" placeholder="Enter medical notes" rows="5"
                 required></textarea>
-
-            <!-- Hidden record_type, defaults to doctor_note -->
-            <input type="hidden" id="record_type" name="record_type" value="doctor_note">
 
             <button id="addRecord" type="submit">Add Record</button>
         </form>
@@ -213,36 +219,45 @@
             });
         }
 
-        // Initialize
-        fetchDashboardData();
-
-
-        //add medical form data retrieval area
+        // Form Submission Handler
         const form = document.getElementById('addMedicalForm');
         const messageDiv = document.getElementById('message');
 
         form.addEventListener('submit', async (e) => {
             e.preventDefault();
+            messageDiv.textContent = '';
 
-            const data = {
-                title: form.title.value,
-                original_text: form.original_text.value,
-                record_type: form.record_type.value
+            const formData = {
+                title: document.getElementById('title').value,
+                record_type: document.getElementById('record_type').value,
+                original_text: document.getElementById('original_text').value
             };
 
             try {
-                const response = await fetch('/api/records', {
+                const response = await fetch('/api/training/medical_record', {
                     method: 'POST',
                     headers: {
-                        'Content-Type': 'application/json'
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${currentUser.access_token}`
                     },
-                    body: JSON.stringify(data)
+                    body: JSON.stringify(formData)
                 });
+
+                if (response.status === 401) {
+                    logout();
+                    return;
+                }
 
                 if (response.ok) {
                     messageDiv.style.color = 'green';
                     messageDiv.textContent = 'Medical record added successfully!';
                     form.reset();
+
+                    // Refresh dashboard data to show new record
+                    setTimeout(() => {
+                        fetchDashboardData();
+                        messageDiv.textContent = '';
+                    }, 2000);
                 } else {
                     const error = await response.json();
                     messageDiv.style.color = 'red';
@@ -253,6 +268,9 @@
                 messageDiv.textContent = `Error: ${err.message}`;
             }
         });
+
+        // Initialize dashboard on page load
+        fetchDashboardData();
     </script>
 </body>
 

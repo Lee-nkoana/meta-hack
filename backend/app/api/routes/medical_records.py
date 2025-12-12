@@ -77,7 +77,7 @@ def create_medical_record():
         )
         
     else:
-        # Handle Standard JSON
+        # Handle Standard JSON (potentially with embedded base64 image)
         try:
             # Validate request data
             if request.is_json:
@@ -93,7 +93,10 @@ def create_medical_record():
             user_id=current_user.id,
             title=record_data['title'],
             original_text=record_data['original_text'],
-            record_type=record_data.get('record_type', 'doctor_note')
+            record_type=record_data.get('record_type', 'doctor_note'),
+            image_data=record_data.get('image_data'),  # Base64 from frontend
+            ocr_confidence=record_data.get('ocr_confidence'),
+            ocr_extracted_text=record_data.get('ocr_extracted_text')
         )
 
     db.add(db_record)

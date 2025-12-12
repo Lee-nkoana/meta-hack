@@ -180,7 +180,8 @@ label {
 }
 
 input,
-textarea {
+textarea,
+select {
     width: 100%;
     padding: 10px;
     margin-top: 5px;
@@ -188,15 +189,108 @@ textarea {
     border: none;
     box-sizing: border-box;
     font-size: 14px;
-    /* transition: border-color 0.2s; */
     background-color: var(--bg-dark);
     color: var(--text-muted);
 }
 
 input:focus,
-textarea:focus {
+textarea:focus,
+select:focus {
     border-color: var(--card-bg);
     outline: none;
+}
+
+/* File input styling */
+input[type="file"] {
+    padding: 8px;
+    cursor: pointer;
+}
+
+input[type="file"]::file-selector-button {
+    background-color: var(--primary);
+    color: white;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 4px;
+    cursor: pointer;
+    margin-right: 10px;
+    font-size: 14px;
+}
+
+input[type="file"]::file-selector-button:hover {
+    background-color: var(--primary-dark);
+}
+
+/* Image preview */
+.image-preview {
+    margin-top: 10px;
+    max-width: 100%;
+    border-radius: 6px;
+    display: none;
+}
+
+.image-preview.show {
+    display: block;
+}
+
+.image-preview img {
+    max-width: 100%;
+    max-height: 300px;
+    border-radius: 6px;
+    border: 2px solid var(--bg-dark);
+}
+
+/* OCR status indicator */
+.ocr-status {
+    margin-top: 10px;
+    padding: 10px;
+    border-radius: 6px;
+    font-size: 14px;
+    display: none;
+}
+
+.ocr-status.show {
+    display: block;
+}
+
+.ocr-status.processing {
+    background-color: rgba(79, 70, 229, 0.1);
+    color: var(--primary);
+    border: 1px solid var(--primary);
+}
+
+.ocr-status.success {
+    background-color: rgba(16, 185, 129, 0.1);
+    color: #34D399;
+    border: 1px solid #34D399;
+}
+
+.ocr-status.error {
+    background-color: rgba(239, 68, 68, 0.1);
+    color: #ef4444;
+    border: 1px solid #ef4444;
+}
+
+/* Loading spinner */
+.spinner {
+    border: 3px solid rgba(255, 255, 255, 0.1);
+    border-top: 3px solid var(--primary);
+    border-radius: 50%;
+    width: 20px;
+    height: 20px;
+    animation: spin 1s linear infinite;
+    display: inline-block;
+    margin-right: 8px;
+}
+
+@keyframes spin {
+    0% {
+        transform: rotate(0deg);
+    }
+
+    100% {
+        transform: rotate(360deg);
+    }
 }
 
 #addRecord {

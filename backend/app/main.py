@@ -7,7 +7,7 @@ from app.config import settings
 from app.database import init_db, close_db
 
 # Import blueprints
-from app.api.routes import auth, medical_records, ai, users, knowledge
+from app.api.routes import auth, medical_records, ai, users, knowledge, medications, training
 
 
 def create_app():
@@ -73,6 +73,8 @@ def create_app():
     app.register_blueprint(ai.bp)
     app.register_blueprint(users.bp)
     app.register_blueprint(knowledge.bp)
+    app.register_blueprint(medications.bp)
+    app.register_blueprint(training.bp)
     
     # Register teardown function for database
     app.teardown_appcontext(close_db)

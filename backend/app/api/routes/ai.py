@@ -41,6 +41,63 @@ ai_response_schema = AIResponseSchema()
 @bp.route('/chat', methods=['POST'])
 @require_auth
 def chat_with_ai():
+    """Chat with AI using medical context (text only)"""
+    current_user = get_current_active_user()
+    db = get_db()
+    
+    # Get JSON data
+    try:
+        data = request.get_json()
+        message = data.get('message', '')
+        include_context = data.get('include_context', True)
+    except Exception as err:
+        return jsonify({"error": "Invalid request format"}), 400
+    
+    context = None
+    
+    # Add Medical Records Context if requested
+    if include_context:
+        # Fetch last 5 records
+        recent_records = db.query(MedicalRecord).filter(
+            MedicalRecord.user_id == current_user.id
+        ).order_by(MedicalRecord.created_at.desc()).limit(5).all()
+        
+        if recent_records:
+            context = "\n\n".join([
+                f"Record ({r.created_at.strftime('%Y-%m-%d')}): {r.title} ({r.record_type})\n{r.original_text}"
+                for r in recent_records
+            ])
+
+    if not ai_service.is_configured:
+        return jsonify({
+            "error": "AI service is not configured."
+        }), 503
+        
+    # Run chat
+    try:
+        import asyncio
+        try:
+            loop = asyncio.get_event_loop()
+            if loop.is_closed():
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+        except RuntimeError:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+        
+        response = loop.run_until_complete(ai_service.chat_with_patient(message, context))
+    except Exception as e:
+        print(f"Chat execution failed: {e}")
+        import traceback
+        traceback.print_exc()
+        response = None
+    
+    if not response:
+         return jsonify({"error": "AI service temporarily unavailable (Model Error). Please try again or switch model."}), 503
+         
+    return jsonify({"response": response}), 200
+@require_auth
+def chat_with_ai():
     """Chat with AI using medical context (supports JSON or Multipart with Image)"""
     current_user = get_current_active_user()
     db = get_db()
@@ -49,6 +106,7 @@ def chat_with_ai():
     message = ""
     include_context = True
     image_description = None
+    ocr_result = None
     
     if 'image' in request.files:
         # Multipart request
@@ -61,27 +119,80 @@ def chat_with_ai():
             image_bytes = file.read()
             image_b64 = base64.b64encode(image_bytes).decode('utf-8')
             
+            # Process with OCR first
+            from app.services.ocr_service import ocr_service
+            try:
+                extracted_text, confidence = ocr_service.extract_text_from_image(image_b64)
+                ocr_result = {
+                    "extracted_text": extracted_text or "",
+                    "confidence": int(confidence * 100) if confidence else 0
+                }
+            except Exception as e:
+                print(f"OCR processing failed: {e}")
+            
             # Use Vision model to describe the image for the chat context
-            # Run async analysis
             prompt = "Describe this medical image in detail so I can answer questions about it."
             try:
                 # Sync wrapper for async call
                 import asyncio
-                loop = asyncio.new_event_loop()
-                asyncio.set_event_loop(loop)
+                try:
+                    loop = asyncio.get_event_loop()
+                    if loop.is_closed():
+                        loop = asyncio.new_event_loop()
+                        asyncio.set_event_loop(loop)
+                except RuntimeError:
+                    loop = asyncio.new_event_loop()
+                    asyncio.set_event_loop(loop)
+                
                 image_description = loop.run_until_complete(ai_service.analyze_image(image_b64, prompt))
-                loop.close()
             except Exception as e:
                 print(f"Chat Image Analysis Failed: {e}")
                 image_description = "Error analyzing image."
     else:
         # Standard JSON
         try:
-            data = chat_request_schema.load(request.get_json())
-            message = data['message']
+            data = request.get_json()
+            message = data.get('message', '')
             include_context = data.get('include_context', True)
-        except ValidationError as err:
-            return jsonify({"errors": err.messages}), 400
+            
+            # Check for base64 image in JSON
+            if 'image_data' in data and data['image_data']:
+                image_b64 = data['image_data']
+                # Remove data URI prefix if present
+                if 'base64,' in image_b64:
+                    image_b64 = image_b64.split('base64,')[1]
+                
+                # Process with OCR first
+                from app.services.ocr_service import ocr_service
+                try:
+                    extracted_text, confidence = ocr_service.extract_text_from_image(image_b64)
+                    ocr_result = {
+                        "extracted_text": extracted_text or "",
+                        "confidence": int(confidence * 100) if confidence else 0
+                    }
+                except Exception as e:
+                    print(f"OCR processing failed: {e}")
+                
+                # Use Vision model to analyze
+                prompt = "Analyze this medical image and describe what you see. Focus on any text, medications, or medical conditions visible."
+                try:
+                    import asyncio
+                    try:
+                        loop = asyncio.get_event_loop()
+                        if loop.is_closed():
+                            loop = asyncio.new_event_loop()
+                            asyncio.set_event_loop(loop)
+                    except RuntimeError:
+                        loop = asyncio.new_event_loop()
+                        asyncio.set_event_loop(loop)
+                    
+                    image_description = loop.run_until_complete(ai_service.analyze_image(image_b64, prompt))
+                except Exception as e:
+                    print(f"Chat Image Analysis Failed: {e}")
+                    image_description = "Error analyzing image."
+                    
+        except Exception as err:
+            return jsonify({"error": "Invalid request format"}), 400
     
     context = None
     context_parts = []
@@ -112,24 +223,40 @@ def chat_with_ai():
             "error": "AI service is not configured."
         }), 503
         
-    # Run chat (handling async loop potentially)
-    # Note: re-using the loop or creating new one depending on environment
+    # Run chat (handling async loop properly)
     try:
         import asyncio
         try:
-             loop = asyncio.get_event_loop()
+            loop = asyncio.get_event_loop()
+            if loop.is_closed():
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
         except RuntimeError:
-             loop = asyncio.new_event_loop()
-             asyncio.set_event_loop(loop)
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+        
         response = loop.run_until_complete(ai_service.chat_with_patient(message, context))
     except Exception as e:
         print(f"Chat execution failed: {e}")
+        import traceback
+        traceback.print_exc()
         response = None
     
     if not response:
          return jsonify({"error": "AI service temporarily unavailable (Model Error). Please try again or switch model."}), 503
          
-    return jsonify({"response": response}), 200
+    # Prepare response
+    response_data = {"response": response}
+    
+    # Include OCR result if available
+    if ocr_result:
+        response_data["ocr_result"] = {
+            "extracted_text": ocr_result.get("extracted_text", ""),
+            "confidence": ocr_result.get("confidence", 0),
+            "medications": ocr_result.get("detected_medications", [])
+        }
+    
+    return jsonify(response_data), 200
 
 
 @bp.route('/translate', methods=['POST'])

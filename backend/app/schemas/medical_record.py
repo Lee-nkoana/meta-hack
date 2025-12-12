@@ -11,7 +11,9 @@ class MedicalRecordBaseSchema(Schema):
 
 class MedicalRecordCreateSchema(MedicalRecordBaseSchema):
     """Schema for creating a new medical record"""
-    pass
+    image_data = fields.Str(allow_none=True)  # Base64 encoded image
+    ocr_confidence = fields.Int(allow_none=True)  # OCR confidence 0-100
+    ocr_extracted_text = fields.Str(allow_none=True)  # Original OCR output
 
 
 class MedicalRecordUpdateSchema(Schema):

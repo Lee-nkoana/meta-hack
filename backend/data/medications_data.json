@@ -1,0 +1,122 @@
+[
+    {
+        "name": "Aspirin",
+        "url": "https://www.drugs.com/aspirin.html",
+        "uses": "Pain relief, fever reduction, anti-inflammatory, prevent heart attacks and strokes in at-risk patients",
+        "side_effects": "Stomach upset, heartburn, nausea, bleeding risk, allergic reactions",
+        "discontinued": false,
+        "discontinuation_reason": null
+    },
+    {
+        "name": "Ibuprofen",
+        "url": "https://www.drugs.com/ibuprofen.html",
+        "uses": "Pain relief, fever reduction, inflammation reduction for conditions like arthritis",
+        "side_effects": "Stomach upset, dizziness, heartburn, nausea, increased bleeding risk, kidney problems",
+        "discontinued": false,
+        "discontinuation_reason": null
+    },
+    {
+        "name": "Acetaminophen",
+        "url": "https://www.drugs.com/acetaminophen.html",
+        "uses": "Pain relief and fever reduction",
+        "side_effects": "Rare at normal doses, liver damage with overdose, allergic reactions",
+        "discontinued": false,
+        "discontinuation_reason": null
+    },
+    {
+        "name": "Metformin",
+        "url": "https://www.drugs.com/metformin.html",
+        "uses": "Treatment of type 2 diabetes, helps control blood sugar levels",
+        "side_effects": "Nausea, diarrhea, stomach upset, lactic acidosis (rare but serious)",
+        "discontinued": false,
+        "discontinuation_reason": null
+    },
+    {
+        "name": "Lisinopril",
+        "url": "https://www.drugs.com/lisinopril.html",
+        "uses": "Treatment of high blood pressure (hypertension), heart failure, improve survival after heart attack",
+        "side_effects": "Dizziness, cough, headache, fatigue, low blood pressure",
+        "discontinued": false,
+        "discontinuation_reason": null
+    },
+    {
+        "name": "Amoxicillin",
+        "url": "https://www.drugs.com/amoxicillin.html",
+        "uses": "Antibiotic for bacterial infections including ear infections, pneumonia, bronchitis, urinary tract infections",
+        "side_effects": "Nausea, diarrhea, rash, allergic reactions",
+        "discontinued": false,
+        "discontinuation_reason": null
+    },
+    {
+        "name": "Atorvastatin",
+        "url": "https://www.drugs.com/atorvastatin.html",
+        "uses": "Lower cholesterol and reduce risk of heart disease and stroke",
+        "side_effects": "Muscle pain, digestive problems, increased blood sugar, liver enzyme changes",
+        "discontinued": false,
+        "discontinuation_reason": null
+    },
+    {
+        "name": "Omeprazole",
+        "url": "https://www.drugs.com/omeprazole.html",
+        "uses": "Treat stomach acid-related conditions like GERD, ulcers, acid indigestion",
+        "side_effects": "Headache, stomach pain, nausea, diarrhea, vitamin B12 deficiency with long-term use",
+        "discontinued": false,
+        "discontinuation_reason": null
+    },
+    {
+        "name": "Levothyroxine",
+        "url": "https://www.drugs.com/levothyroxine.html",
+        "uses": "Treat hypothyroidism (underactive thyroid)",
+        "side_effects": "When dose is too high: rapid heartbeat, weight loss, tremors, anxiety, sleep problems",
+        "discontinued": false,
+        "discontinuation_reason": null
+    },
+    {
+        "name": "Amlodipine",
+        "url": "https://www.drugs.com/amlodipine.html",
+        "uses": "Treatment of high blood pressure and chest pain (angina)",
+        "side_effects": "Swelling in ankles/feet, dizziness, flushing, headache, fatigue",
+        "discontinued": false,
+        "discontinuation_reason": null
+    },
+    {
+        "name": "Zantac",
+        "url": "https://www.drugs.com/zantac.html",
+        "uses": "Previously used for heartburn and stomach ulcers (ranitidine)",
+        "side_effects": "Headache, constipation, diarrhea, nausea",
+        "discontinued": true,
+        "discontinuation_reason": "Recalled in 2020 due to contamination with NDMA, a probable carcinogen"
+    },
+    {
+        "name": "Vioxx",
+        "url": "https://www.drugs.com/vioxx.html",
+        "uses": "Previously used for pain and inflammation (rofecoxib)",
+        "side_effects": "Increased risk of heart attack and stroke, stomach upset",
+        "discontinued": true,
+        "discontinuation_reason": "Withdrawn in 2004 due to increased cardiovascular risks"
+    },
+    {
+        "name": "Gabapentin",
+        "url": "https://www.drugs.com/gabapentin.html",
+        "uses": "Treat nerve pain, seizures, restless leg syndrome",
+        "side_effects": "Dizziness, drowsiness, fatigue, coordination problems, weight gain",
+        "discontinued": false,
+        "discontinuation_reason": null
+    },
+    {
+        "name": "Prednisone",
+        "url": "https://www.drugs.com/prednisone.html",
+        "uses": "Corticosteroid for inflammation, allergies, autoimmune conditions, asthma",
+        "side_effects": "Weight gain, mood changes, increased appetite, high blood sugar, weakened immune system",
+        "discontinued": false,
+        "discontinuation_reason": null
+    },
+    {
+        "name": "Albuterol",
+        "url": "https://www.drugs.com/albuterol.html",
+        "uses": "Bronchodilator for asthma and COPD, opens airways",
+        "side_effects": "Shakiness, nervousness, rapid heartbeat, headache",
+        "discontinued": false,
+        "discontinuation_reason": null
+    }
+]

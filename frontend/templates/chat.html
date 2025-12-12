@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI Medical Assistant</title>
+    <title>MedBridge AI Assistant</title>
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
     <style>
         :root {
@@ -136,6 +136,44 @@
             margin-bottom: 0.5rem;
             display: none;
         }
+
+        .image-upload-btn {
+            padding: 0.75rem;
+            background-color: var(--card-bg);
+            border: 1px solid #374151;
+            color: var(--text-muted);
+            border-radius: 0.5rem;
+            cursor: pointer;
+            font-size: 1.25rem;
+            transition: all 0.2s;
+        }
+
+        .image-upload-btn:hover {
+            background-color: var(--primary);
+            color: white;
+        }
+
+        .image-preview {
+            max-width: 300px;
+            margin: 0.5rem 0;
+            border-radius: 0.5rem;
+            border: 2px solid #374151;
+        }
+
+        .message img {
+            max-width: 100%;
+            border-radius: 0.5rem;
+            margin-top: 0.5rem;
+        }
+
+        .ocr-result {
+            background: rgba(79, 70, 229, 0.1);
+            padding: 0.5rem;
+            border-radius: 0.25rem;
+            margin-top: 0.5rem;
+            font-size: 0.875rem;
+            border-left: 3px solid var(--primary);
+        }
     </style>
 </head>
 
@@ -143,7 +181,7 @@
     <nav class="navbar">
         <div style="display: flex; align-items: center; gap: 1rem;">
             <a href="/dashboard" style="text-decoration: none; color: var(--text-muted); font-size: 1.5rem;">&larr;</a>
-            <span style="font-weight: 700; font-size: 1.25rem;">Medical Assistant 🤖</span>
+            <span style="font-weight: 700; font-size: 1.25rem;">MedBridge Assistant 🤖</span>
         </div>
         <div style="color: var(--text-muted); font-size: 0.875rem;">Powered by Llama 3</div>
     </nav>
