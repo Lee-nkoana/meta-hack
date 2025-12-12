@@ -44,19 +44,15 @@
 
 <body>
     <div id="login_section">
-        <h1>Enter Registration details</h1>
         <form id="registerForm" method="post">
-           
+            <h1>Enter Registration details</h1>
             <input autofocus class="form-control" type="text" name="username" placeholder="Username" />
-           
             <input class="form-control" type="text" name="email" placeholder="Email" />
-           
             <input class="form-control" type="password" name="password" placeholder="Password" />
-           
             <input class="form-control" type="password" name="confirm_password" placeholder="Confirm Password" />
             <input class="btn-primary" type="submit" value="Sign Up" />
+            Already have an account? <a href="{{ url_for('login') }}">Login here.</a>
         </form>
-        Already have an account? <a href="{{ url_for('login') }}">Login here.</a>
     </div>
 
     <script src="{{ url_for('static', filename='js/api_connector.js') }}" defer></script>
