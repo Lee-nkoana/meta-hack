@@ -5,8 +5,8 @@ from unittest.mock import patch, AsyncMock
 class TestAIFallback:
     """Tests for AI fallback logic (Groq -> Hugging Face -> Ollama)"""
 
-    @patch('app.services.ai_service.settings.GROQ_API_KEY', 'valid_groq_key')
-    @patch('app.services.ai_service.settings.HUGGINGFACE_API_KEY', 'valid_hf_key')
+    @patch('app.config.settings.GROQ_API_KEY', 'valid_groq_key')
+    @patch('app.config.settings.HUGGINGFACE_API_KEY', 'valid_hf_key')
     def test_groq_success(self, client, auth_headers):
         """Test that Groq is used when configured and works (Priority 1)"""
         from app.services.ai_service import ai_service
@@ -39,8 +39,8 @@ class TestAIFallback:
             assert not mock_ollama.called
             assert "Response from Groq" in response.get_json()["result"]
 
-    @patch('app.services.ai_service.settings.GROQ_API_KEY', 'valid_groq_key')
-    @patch('app.services.ai_service.settings.HUGGINGFACE_API_KEY', 'valid_hf_key')
+    @patch('app.config.settings.GROQ_API_KEY', 'valid_groq_key')
+    @patch('app.config.settings.HUGGINGFACE_API_KEY', 'valid_hf_key')
     def test_fallback_to_huggingface(self, client, auth_headers):
         """Test fallback to Hugging Face when Groq fails (Priority 2)"""
         from app.services.ai_service import ai_service
@@ -68,8 +68,8 @@ class TestAIFallback:
             assert not mock_ollama.called
             assert "Response from Hugging Face" in response.get_json()["result"]
 
-    @patch('app.services.ai_service.settings.GROQ_API_KEY', 'valid_groq_key')
-    @patch('app.services.ai_service.settings.HUGGINGFACE_API_KEY', 'valid_hf_key')
+    @patch('app.config.settings.GROQ_API_KEY', 'valid_groq_key')
+    @patch('app.config.settings.HUGGINGFACE_API_KEY', 'valid_hf_key')
     def test_fallback_to_ollama(self, client, auth_headers):
         """Test fallback to Ollama when Groq and HF fail (Priority 3)"""
         from app.services.ai_service import ai_service
