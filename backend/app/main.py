@@ -97,6 +97,10 @@ def create_app():
     def register():
         """Register page"""
         return render_template("register.html")
+    
+    @app.context_processor
+    def inject_base_url():
+        return dict(base_url=settings.BASE_URL)
 
     @app.route("/chat")
     def chat_page():

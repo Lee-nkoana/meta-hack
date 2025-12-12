@@ -100,6 +100,9 @@
     </main>
 
     <script>
+        // Initialize API Base URL from server-side config
+        const API_BASE_URL = "{{ base_url }}";
+
         // Auth Check
         const currentUser = JSON.parse(localStorage.getItem("currentUser"));
         if (!currentUser || !currentUser.access_token) {
@@ -115,7 +118,7 @@
         async function fetchProfileData() {
             try {
                 // Fetch user profile
-                const userResponse = await fetch('/api/users/me', {
+                const userResponse = await fetch(`${API_BASE_URL}/api/users/me`, {
                     headers: { 'Authorization': `Bearer ${currentUser.access_token}` }
                 });
 
@@ -128,7 +131,7 @@
                 displayUserInfo(userData);
 
                 // Fetch dashboard data for statistics
-                const dashResponse = await fetch('/api/users/dashboard', {
+                const dashResponse = await fetch(`${API_BASE_URL}/api/users/dashboard`, {
                     headers: { 'Authorization': `Bearer ${currentUser.access_token}` }
                 });
 

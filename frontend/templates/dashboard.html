@@ -119,6 +119,9 @@
     </main>
 
     <script>
+        // Initialize API Base URL from server-side config
+        const API_BASE_URL = "{{ base_url }}";
+
         // Auth Check
         const currentUser = JSON.parse(localStorage.getItem("currentUser"));
         if (!currentUser || !currentUser.access_token) {
@@ -137,7 +140,7 @@
 
         async function fetchDashboardData() {
             try {
-                const response = await fetch('/api/users/dashboard', {
+                const response = await fetch(`${API_BASE_URL}/api/users/dashboard`, {
                     headers: { 'Authorization': `Bearer ${currentUser.access_token}` }
                 });
 
@@ -247,7 +250,7 @@
             };
 
             try {
-                const response = await fetch('/api/training/medical_record', {
+                const response = await fetch(`${API_BASE_URL}/api/records`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',

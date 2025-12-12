@@ -17,6 +17,7 @@ class Settings:
     
     # Flask
     FLASK_ENV: str = os.getenv("FLASK_ENV", "development")
+    BASE_URL: str = os.getenv("BASE_URL", "http://localhost:8000")
     
     # Database
     DATABASE_URL: str = os.getenv("DATABASE_URL", "sqlite:///./medical_records.db")

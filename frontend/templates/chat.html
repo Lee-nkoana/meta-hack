@@ -207,6 +207,9 @@
     </div>
 
     <script>
+        // Initialize API Base URL from server-side config
+        const API_BASE_URL = "{{ base_url }}";
+
         const chatContainer = document.getElementById('chatContainer');
         const userInput = document.getElementById('userInput');
         const sendBtn = document.getElementById('sendBtn');
@@ -231,7 +234,7 @@
             typingIndicator.style.display = 'block';
 
             try {
-                const response = await fetch('/api/ai/chat', {
+                const response = await fetch(`${API_BASE_URL}/api/ai/chat`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',

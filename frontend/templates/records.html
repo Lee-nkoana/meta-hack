@@ -115,6 +115,9 @@
     </div>
 
     <script>
+        // Initialize API Base URL from server-side config
+        const API_BASE_URL = "{{ base_url }}";
+
         // Auth Check
         const currentUser = JSON.parse(localStorage.getItem("currentUser"));
         if (!currentUser || !currentUser.access_token) {
@@ -132,7 +135,7 @@
         // Fetch all records
         async function fetchAllRecords() {
             try {
-                const response = await fetch('/api/records', {
+                const response = await fetch(`${API_BASE_URL}/api/records`, {
                     headers: { 'Authorization': `Bearer ${currentUser.access_token}` }
                 });
 
@@ -170,7 +173,7 @@
             document.getElementById('recentRecords').textContent = thisMonth;
 
             // Update user name
-            fetch('/api/users/me', {
+            fetch(`${API_BASE_URL}/api/users/me`, {
                 headers: { 'Authorization': `Bearer ${currentUser.access_token}` }
             }).then(r => r.json()).then(data => {
                 document.getElementById('userName').textContent = data.full_name || data.username;
@@ -264,7 +267,7 @@
 
         async function fetchRecordDetails(id) {
             try {
-                const response = await fetch(`/api/records/${id}`, {
+                const response = await fetch(`${API_BASE_URL}/api/records/${id}`, {
                     headers: { 'Authorization': `Bearer ${currentUser.access_token}` }
                 });
 
