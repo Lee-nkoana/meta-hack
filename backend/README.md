@@ -24,10 +24,17 @@ A FastAPI-based backend service for the Medical Records Bridge application. This
 
 ## Prerequisites
 
-- Python 3.9 or higher
+- Python 3.10 or higher
 - pip (Python package installer)
-- (Optional) Hugging Face API Token (for primary AI features)
-- (Optional) Ollama installed locally (for fallback AI features)
+- `python3.10-venv` package for creating virtual environments
+  ```bash
+  # Install on Ubuntu/Debian
+  sudo apt install python3.10-venv
+  ```
+- PostgreSQL 12+ installed and running
+- (Optional) Groq API Key for AI features (primary)
+- (Optional) Hugging Face API Token for AI fallback
+- (Optional) Ollama installed locally for offline AI features
 
 ## Installation
 
@@ -35,9 +42,20 @@ A FastAPI-based backend service for the Medical Records Bridge application. This
 
 ```bash
 pip install -r requirements.txt
+pip install -r requirements-test.txt  # For running tests
 ```
 
-### 2. Configure Environment
+### 2. Set Up PostgreSQL Database
+
+```bash
+# Create PostgreSQL user (superuser for development)
+sudo -u postgres createuser -s medbridge
+
+# Create database
+sudo -u postgres createdb -O medbridge medbridge
+```
+
+### 3. Configure Environment
 
 Copy the example environment file and configure your settings:
 
@@ -50,17 +68,27 @@ Edit the `.env` file with your configuration:
 ```env
 # Required Settings
 SECRET_KEY=your-secret-key-here
-DATABASE_URL=sqlite:///./medical_records.db
+DATABASE_URL=postgresql://medbridge@localhost:5432/medbridge
 
 # Optional: AI Features (Primary)
-HUGGINGFACE_API_KEY=hf_your_token_here
+GROQ_API_KEY=your-groq-api-key-here
+GROQ_MODEL=llama-3.3-70b-versatile
 
 # Optional: AI Features (Fallback)
+HUGGINGFACE_API_KEY=hf_your_token_here
 OLLAMA_BASE_URL=http://localhost:11434
 OLLAMA_MODEL=llama3
 ```
 
-### 3. Run the Server
+### 4. Seed Database (Optional)
+
+Populate the database with test data:
+
+```bash
+make seed
+```
+
+### 5. Run the Server
 
 ```bash
 flask run
@@ -259,32 +287,61 @@ The application uses SQLite by default for easy setup and development. The datab
 
 ### Migrating to PostgreSQL
 
-For production use, update your `.env`:
+**Already using PostgreSQL!** The default configuration now uses PostgreSQL.
 
+Your current setup:
 ```env
-DATABASE_URL=postgresql://user:password@localhost/dbname
+DATABASE_URL=postgresql://medbridge@localhost:5432/medbridge
 ```
 
 ## AI Integration
 
-The backend integrates with **Hugging Face Inference API** as the primary AI provider, with **Ollama** as a local fallback.
+The backend integrates with **Groq** as the primary AI provider, with **Hugging Face** and **Ollama** as fallbacks.
 
-### How to obtain a Hugging Face Token (Quick Guide)
+### Priority Order
+1. **Groq** (Primary) - Fast, free tier, 70B model
+2. **Hugging Face** (Fallback) - Serverless inference
+3. **Ollama** (Local Fallback) - Privacy-focused, offline capable
 
-1.  **Sign Up/Log In**: Go to [huggingface.co](https://huggingface.co/).
-2.  **Settings**: Click profile picture -> **Settings**.
-3.  **Access Tokens**: Select **Access Tokens** from the sidebar.
-4.  **Create Token**: Click **Create new token**, name it (e.g., `MedicalApp`), select **Read** permissions, and create.
-5.  **Configure**: Copy the token (starts with `hf_`) and paste it into your `.env`:
-    ```env
-    HUGGINGFACE_API_KEY=hf_...
-    ```
+### How to obtain a Groq API Key
+
+1. **Sign Up**: Go to [console.groq.com](https://console.groq.com/)
+2. **API Keys**: Navigate to API Keys section
+3. **Create Key**: Generate new API key
+4. **Configure**: Add to your `.env`:
+   ```env
+   GROQ_API_KEY=gsk_...
+   ```
 
 - **Medical Translation**: Converts complex medical terminology into simple language
 - **Lifestyle Suggestions**: Generates personalized wellness tips (not medical advice)
 - **Response Caching**: AI responses are cached in the database to reduce API calls
 
 Note: The backend works without an API key if Ollama is running locally. If neither is available, AI features will be disabled.
+
+## Testing
+
+The project includes a comprehensive test suite covering authentication, medical records, AI services, and user management.
+
+### Running Tests
+
+```bash
+# Run all tests
+make test
+
+# Run specific test suites
+make test-ai        # AI service tests
+make test-auth      # Authentication tests
+make test-records   # Medical records tests
+make test-users     # User profile tests
+```
+
+### Test Coverage
+
+- **61 tests** covering all major functionality
+- Isolated test database (SQLite)
+- Mocked AI services for fast execution
+- Authentication and authorization checks
 
 ## Development
 

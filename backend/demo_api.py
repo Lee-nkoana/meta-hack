@@ -25,7 +25,7 @@ class Colors:
 class APIDemo:
     """Interactive API demonstration"""
     
-    def __init__(self, base_url: str = "http://localhost:8000"):
+    def __init__(self, base_url: str = "http://localhost:5000"):
         self.base_url = base_url
         self.token: Optional[str] = None
         self.user_id: Optional[int] = None
@@ -351,7 +351,7 @@ def main():
     """Main entry point"""
     import sys
     
-    base_url = "http://localhost:8000"
+    base_url = "http://localhost:5000"
     if len(sys.argv) > 1:
         base_url = sys.argv[1]
     

@@ -2,7 +2,7 @@
 
 A comprehensive application that bridges the gap between patients and medical professionals by streamlining access to medical records and helping patients understand their medical data using AI.
 
-##Features
+## Features
 
 - **User Authentication**: Secure registration and login system with JWT tokens
 - **Medical Records Management**: Upload, store, and manage medical records (doctor's notes, lab results, prescriptions)
@@ -14,24 +14,28 @@ A comprehensive application that bridges the gap between patients and medical pr
 ## Tech Stack
 
 ### Backend
-- **FastAPI**: Modern, fast web framework for building APIs
+- **Flask**: Lightweight and flexible web framework with excellent extension support
 - **SQLAlchemy**: SQL toolkit and ORM
-- **SQLite**: Database (development) - easily upgradeable to PostgreSQL for production
-- **Pydantic**: Data validation using Python type annotations
-- **JWT**: Secure authentication with JSON Web Tokens
-- **Meta AI (Llama)**: AI-powered medical text translation via Together AI API
+- **PostgreSQL**: Production-grade relational database
+- **Marshmallow**: Data serialization and validation
+- **Flask-JWT-Extended**: JWT-based authentication
+- **Groq AI**: Fast AI inference (Primary)
+- **Hugging Face**: AI model fallback
+- **Ollama**: Local AI inference (Fallback)
 
 ### Frontend
 - Coming soon...
 
-##  Prerequisites
+## Prerequisites
 
-- Python 3.9 or higher
+- Python 3.10 or higher
 - pip (Python package installer)
-- Virtual environment tool (venv)
-- Meta AI API key (get from [Together AI](https://api.together.xyz/))
+- `python3.10-venv` package (for virtual environments)
+- PostgreSQL 12+ installed and running
+- (Optional) Groq API key for AI features
+- (Optional) Hugging Face API token for AI fallback
 
-##  Setup Instructions
+## Setup Instructions
 
 ### Backend Setup
 
@@ -46,10 +50,15 @@ A comprehensive application that bridges the gap between patients and medical pr
    cd backend
    ```
 
-3. **Create and activate virtual environment**
+3. **Install venv package (Ubuntu/Debian)**
+   ```bash
+   sudo apt install python3.10-venv
+   ```
+
+4. **Create and activate virtual environment**
    ```bash
    # Create virtual environment
-   python -m venv venv
+   python3 -m venv venv
    
    # Activate on Linux/Mac
    source venv/bin/activate
@@ -58,30 +67,46 @@ A comprehensive application that bridges the gap between patients and medical pr
    venv\Scripts\activate
    ```
 
-4. **Install dependencies**
+5. **Install dependencies**
    ```bash
    pip install -r requirements.txt
+   pip install -r requirements-test.txt  # For testing
    ```
 
-5. **Configure environment variables**
+6. **Set up PostgreSQL database**
+   ```bash
+   # Create PostgreSQL user and database
+   sudo -u postgres createuser -s medbridge
+   sudo -u postgres createdb -O medbridge medbridge
+   ```
+
+7. **Configure environment variables**
    ```bash
    # Copy the example environment file
    cp .env.example .env
    
-   # Edit .env and add your configuration
-   # Most importantly, add your META_AI_API_KEY
+   # Edit .env and configure:
+   # - DATABASE_URL (PostgreSQL connection)
+   # - GROQ_API_KEY (for AI features)
+   # - HUGGINGFACE_API_KEY (optional fallback)
    ```
 
-6. **Run the application**
+8. **Seed the database (optional)**
    ```bash
-   uvicorn app.main:app --reload
+   make seed
    ```
 
-   The API will be available at `http://localhost:8000`
+9. **Run the application**
+   ```bash
+   flask run
+   # Or use make:
+   make run
+   ```
 
-7. **Access API Documentation**
-   - Swagger UI: `http://localhost:8000/docs`
-   - ReDoc: `http://localhost:8000/redoc`
+   The API will be available at `http://localhost:5000`
+
+10. **Access API Documentation**
+   - Swagger UI: `http://localhost:5000/apidocs`
 
 ## Environment Variables
 
@@ -90,24 +115,29 @@ Create a `.env` file in the `backend` directory with the following variables:
 ```env
 # Security
 SECRET_KEY=your-secret-key-change-this-in-production
-ALGORITHM=HS256
 ACCESS_TOKEN_EXPIRE_MINUTES=30
 
-# Database
-DATABASE_URL=sqlite:///./medical_records.db
+# Database (PostgreSQL)
+DATABASE_URL=postgresql://medbridge@localhost:5432/medbridge
 
-# Meta AI Configuration (Together AI)
-META_AI_API_KEY=your-together-ai-api-key-here
-META_AI_MODEL=meta-llama/Llama-3-70b-chat-hf
-META_AI_BASE_URL=https://api.together.xyz/v1
+# AI Configuration
+GROQ_API_KEY=your-groq-api-key-here
+GROQ_MODEL=llama-3.3-70b-versatile
+HUGGINGFACE_API_KEY=your-hf-token-here  # Optional fallback
+OLLAMA_BASE_URL=http://localhost:11434  # Local fallback
 ```
 
-### Getting Meta AI API Key
+### Getting AI API Keys
 
-1. Sign up at [Together AI](https://api.together.xyz/)
-2. Navigate to API Keys section
-3. Create a new API key
-4. Copy the key and add it to your `.env` file
+**Groq (Primary - Fast & Free)**
+1. Sign up at [Groq Console](https://console.groq.com/)
+2. Navigate to API Keys
+3. Create new key and add to `.env`
+
+**Hugging Face (Fallback - Optional)**
+1. Sign up at [Hugging Face](https://huggingface.co/)
+2. Go to Settings → Access Tokens
+3. Create token and add to `.env`
 
 ## API Endpoints
 
@@ -159,7 +189,20 @@ META_AI_BASE_URL=https://api.together.xyz/v1
    - Click "Authorize" and enter your token
    - Test all endpoints interactively
 
-##️ Project Structure
+## Testing
+
+```bash
+# Run all tests
+make test
+
+# Run specific test suites
+make test-auth
+make test-ai
+make test-records
+make test-users
+```
+
+## Project Structure
 
 ```
 backend/

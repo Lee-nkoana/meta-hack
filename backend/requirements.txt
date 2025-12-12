@@ -1,18 +1,45 @@
+# Backend Requirements
+# Medical Records Bridge API Dependencies
+
+# ============================================
+# Web Framework & Extensions
+# ============================================
 flask==3.0.0
 flask-cors==4.0.0
 flask-sqlalchemy==3.1.1
 flask-jwt-extended==4.5.3
 gunicorn==21.2.0
+
+# ============================================
+# Database & ORM
+# ============================================
 sqlalchemy>=2.0.25
+psycopg2-binary>=2.9.11  # PostgreSQL adapter
 marshmallow==3.20.1
 marshmallow-sqlalchemy==0.29.0
+
+# ============================================
+# Security & Authentication
+# ============================================
 bcrypt==4.1.2
-python-multipart==0.0.6
-httpx==0.25.1
 python-dotenv==1.0.0
 email-validator==2.1.0
+
+# ============================================
+# API Documentation
+# ============================================
 flasgger==0.9.7.1
+
+# ============================================
+# AI Services
+# ============================================
+httpx==0.25.1
 numpy
 huggingface_hub>=0.23.0
 groq>=0.5.0
 
+# ============================================
+# Utilities
+# ============================================
+python-multipart==0.0.6
+requests>=2.31.0  # For demo script
